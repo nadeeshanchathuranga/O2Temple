@@ -5,10 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { PlusIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon, ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
-import CreateCustomerModal from './Components/CreateCustomerModal';
-import EditCustomerModal from './Components/EditCustomerModal';
-import DeleteCustomerModal from './Components/DeleteCustomerModal';
+import { PlusIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import CreateCustomerModal from './CreateCustomerModal';
+import EditCustomerModal from './EditCustomerModal';
+import DeleteCustomerModal from './DeleteCustomerModal';
 
 interface Customer {
   id: number;
@@ -64,7 +64,7 @@ const CustomerManagement: React.FC<Props> = ({ customers, filters }) => {
   return (
     <>
       <Head title="Customer Management" />
-
+      
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Header */}
@@ -77,16 +77,16 @@ const CustomerManagement: React.FC<Props> = ({ customers, filters }) => {
               >
                 <ArrowLeftIcon className="w-5 h-5 text-gray-600" />
               </Button>
-
-              <img
-                src="/jaanNetworklogo.jpeg"
-                alt="JAAN Network"
+              
+              <img 
+                src="/jaanNetworklogo.jpeg" 
+                alt="JAAN Network" 
                 className="h-8 w-auto object-contain"
               />
-
+              
               <h1 className="text-xl font-semibold text-gray-900">Customer Management</h1>
             </div>
-
+            
             <div className="px-3 py-1.5 bg-teal-500 text-white rounded-lg text-sm font-medium">
               Customers
             </div>
@@ -104,7 +104,7 @@ const CustomerManagement: React.FC<Props> = ({ customers, filters }) => {
                   />
                   <Label htmlFor="active_only" className="text-sm text-gray-700">Active only</Label>
                 </div>
-
+                
                 <form onSubmit={handleSearch} className="flex items-center gap-2">
                   <div className="relative">
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -119,7 +119,7 @@ const CustomerManagement: React.FC<Props> = ({ customers, filters }) => {
                 </form>
               </div>
 
-              <Button
+              <Button 
                 className="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg font-medium"
                 onClick={() => setShowCreateModal(true)}
               >
@@ -129,8 +129,7 @@ const CustomerManagement: React.FC<Props> = ({ customers, filters }) => {
             </div>
 
             {/* Table Header */}
-            <div className="grid grid-cols-6 gap-6 px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">#</div>
+            <div className="grid grid-cols-5 gap-6 px-6 py-4 bg-gray-50 border-b border-gray-200">
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">NAME</div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">PHONE</div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">EMAIL</div>
@@ -140,11 +139,8 @@ const CustomerManagement: React.FC<Props> = ({ customers, filters }) => {
 
             {/* Table Body */}
             <div className="divide-y divide-gray-200">
-              {customers.data.map((customer, index) => (
-                <div key={customer.id} className="grid grid-cols-6 gap-6 px-6 py-4 items-center hover:bg-gray-50 transition-colors">
-                  <div className="text-sm text-gray-500 font-medium">
-                    {customers.meta ? (customers.meta.current_page - 1) * customers.meta.per_page + index + 1 : index + 1}
-                  </div>
+              {customers.data.map((customer) => (
+                <div key={customer.id} className="grid grid-cols-5 gap-6 px-6 py-4 items-center hover:bg-gray-50 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
                       <span className="text-teal-600 font-medium text-sm">
@@ -189,80 +185,23 @@ const CustomerManagement: React.FC<Props> = ({ customers, filters }) => {
                 <p className="text-gray-500">Get started by adding your first customer.</p>
               </div>
             )}
-
-            {/* Pagination */}
-            {customers.data.length > 0 && customers.meta && customers.links && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
-                <div className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{customers.meta.from || 1}</span> to{' '}
-                  <span className="font-medium">{customers.meta.to || customers.data.length}</span> of{' '}
-                  <span className="font-medium">{customers.meta.total || customers.data.length}</span> results
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* Previous Button */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => customers.links.prev && router.get(customers.links.prev)}
-                    disabled={!customers.links.prev}
-                    className="flex items-center gap-1 px-3 py-2"
-                  >
-                    <ChevronLeftIcon className="w-4 h-4" />
-                    Previous
-                  </Button>
-
-                  {/* Page Numbers */}
-                  <div className="flex items-center gap-1">
-                    {customers.meta.links && customers.meta.links.slice(1, -1).map((link: any, index: number) => (
-                      <Button
-                        key={index}
-                        variant={link.active ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => link.url && router.get(link.url)}
-                        disabled={!link.url}
-                        className={`px-3 py-2 min-w-[40px] ${
-                          link.active
-                            ? 'bg-teal-500 hover:bg-teal-600 text-white'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        {link.label}
-                      </Button>
-                    ))}
-                  </div>
-
-                  {/* Next Button */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => customers.links.next && router.get(customers.links.next)}
-                    disabled={!customers.links.next}
-                    className="flex items-center gap-1 px-3 py-2"
-                  >
-                    Next
-                    <ChevronRightIcon className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
 
       {/* Modals */}
-      <CreateCustomerModal
+      <CreateCustomerModal 
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
       />
-
-      <EditCustomerModal
+      
+      <EditCustomerModal 
         open={showEditModal}
         onOpenChange={setShowEditModal}
         customer={editingCustomer}
       />
-
-      <DeleteCustomerModal
+      
+      <DeleteCustomerModal 
         open={showDeleteModal}
         onOpenChange={setShowDeleteModal}
         customer={editingCustomer}

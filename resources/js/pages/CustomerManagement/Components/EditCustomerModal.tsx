@@ -44,8 +44,24 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
     }
   }, [customer, setData, reset]);
 
+  // Validation helpers
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ''); // allow digits only
+    if (value.length <= 10) setData('phone', value);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Client-side validation
+    if (!data.name || !data.name.trim()) return;
+    if (!data.phone || data.phone.length !== 10) return;
+    if (data.email && !validateEmail(data.email)) return;
+
     if (customer) {
       put(`/customers/${customer.id}`, {
         onSuccess: () => {
@@ -71,7 +87,7 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
               <PencilIcon className="w-5 h-5 text-white" />
             </div>
             <h2 className="text-lg font-semibold text-gray-900">Edit Customer</h2>
-            <button 
+            <button
               onClick={handleClose}
               className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
             >
@@ -80,7 +96,7 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
               </svg>
             </button>
           </div>
-          
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="px-6 pb-6 bg-white">
             <div className="space-y-5 mt-4">
@@ -94,6 +110,7 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
                   placeholder="Enter customer name"
                   value={data.name}
                   onChange={(e) => setData('name', e.target.value)}
+                  required
                   className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
                 />
                 {errors.name && (
@@ -110,11 +127,19 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
                   type="text"
                   placeholder="Enter phone number"
                   value={data.phone}
-                  onChange={(e) => setData('phone', e.target.value)}
+                  onChange={handlePhoneChange}
+                  required
+                  maxLength={10}
                   className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
                 />
                 {errors.phone && (
                   <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+                )}
+                {data.phone && data.phone.length !== 10 && (
+                  <p className="text-red-500 text-xs mt-1">Phone number must be exactly 10 digits</p>
+                )}
+                {data.phone && data.phone.length > 0 && (
+                  <p className="text-gray-500 text-xs mt-1">{data.phone.length}/10 digits</p>
                 )}
               </div>
 
@@ -136,8 +161,8 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
               </div>
 
               <div className="flex items-center gap-2">
-                <Checkbox 
-                  id="edit_active" 
+                <Checkbox
+                  id="edit_active"
                   defaultChecked={true}
                   className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-1 focus:ring-teal-500 bg-white"
                 />
@@ -149,17 +174,17 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
 
             {/* Buttons */}
             <div className="flex justify-end gap-3 mt-6">
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 variant="ghost"
                 onClick={handleClose}
                 className="px-6 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 font-medium"
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                disabled={processing} 
+              <Button
+                type="submit"
+                disabled={processing}
                 className="px-6 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg font-medium"
               >
                 Update Customer

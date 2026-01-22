@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\BedManagementController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -42,13 +44,10 @@ Route::middleware(['auth', 'verified', 'role:Staff'])->prefix('staff')->group(fu
     })->name('staff.dashboard');
 });
 
-// Customer Management Routes
+// Resource Routes
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('customers', [\App\Http\Controllers\CustomerController::class, 'index'])->name('customers.index');
-    Route::post('customers', [\App\Http\Controllers\CustomerController::class, 'store'])->name('customers.store');
-    Route::get('customers/{customer}', [\App\Http\Controllers\CustomerController::class, 'show'])->name('customers.show');
-    Route::put('customers/{customer}', [\App\Http\Controllers\CustomerController::class, 'update'])->name('customers.update');
-    Route::delete('customers/{customer}', [\App\Http\Controllers\CustomerController::class, 'destroy'])->name('customers.destroy');
+    Route::resource('customers', CustomerController::class)->except(['create', 'edit']);
+    Route::resource('beds', BedManagementController::class);
 });
 
 require __DIR__.'/settings.php';

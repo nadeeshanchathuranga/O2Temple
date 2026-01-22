@@ -1,10 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
-import { 
-    ShoppingCart, 
-    Bed, 
-    Package, 
-    Users, 
-    CreditCard, 
+import {
+    ShoppingCart,
+    Bed,
+    Package,
+    Users,
+    CreditCard,
     BarChart3,
     Activity,
     Calendar
@@ -81,7 +81,7 @@ export default function Dashboard({ user }: DashboardProps) {
     return (
         <HeaderLayout user={user}>
             <Head title="O2 Temple Dashboard" />
-            
+
             {/* Dashboard Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {dashboardModules.map((module) => {
@@ -93,7 +93,7 @@ export default function Dashboard({ user }: DashboardProps) {
                             {/* Background decoration */}
                             <div className="absolute top-0 right-0 -mr-4 -mt-4 w-16 h-16 rounded-full bg-white/10"></div>
                             <div className="absolute bottom-0 left-0 -ml-8 -mb-8 w-20 h-20 rounded-full bg-black/5"></div>
-                            
+
                             {/* Content */}
                             <div className="relative z-10">
                                 {/* Icon */}
@@ -102,12 +102,12 @@ export default function Dashboard({ user }: DashboardProps) {
                                         <IconComponent className="w-6 h-6 text-white" />
                                     </div>
                                 </div>
-                                
+
                                 {/* Title */}
                                 <h3 className={`${module.textColor} text-lg font-bold mb-2 leading-tight`}>
                                     {module.title}
                                 </h3>
-                                
+
                                 {/* Description */}
                                 <p className={`${module.textColor} text-sm opacity-90 leading-relaxed`}>
                                     {module.description}
@@ -118,7 +118,7 @@ export default function Dashboard({ user }: DashboardProps) {
                             <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"></div>
                         </div>
                     );
-                    
+
                     return (
                         <div key={module.id}>
                             {module.href === '#' ? (

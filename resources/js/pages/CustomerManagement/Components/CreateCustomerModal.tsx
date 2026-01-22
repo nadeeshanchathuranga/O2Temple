@@ -21,8 +21,21 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ open, onOpenC
     email: '',
   });
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+    if (value.length <= 10) { // Limit to 10 digits
+      setData('phone', value);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Phone validation: must be exactly 10 digits
+    if (data.phone.length !== 10) {
+      return; // Let HTML required handle empty field, but prevent submission for invalid length
+    }
+
     post('/customers', {
       onSuccess: () => {
         onOpenChange(false);
@@ -50,7 +63,7 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ open, onOpenC
               </svg>
             </div>
             <h2 className="text-lg font-semibold text-gray-900">Create Customer</h2>
-            <button 
+            <button
               onClick={() => onOpenChange(false)}
               className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
             >
@@ -59,7 +72,7 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ open, onOpenC
               </svg>
             </button>
           </div>
-          
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="px-6 pb-6 bg-white">
             <div className="space-y-5 mt-4">
@@ -73,6 +86,7 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ open, onOpenC
                   placeholder="Enter customer name"
                   value={data.name}
                   onChange={(e) => setData('name', e.target.value)}
+                  required
                   className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
                 />
                 {errors.name && (
@@ -87,13 +101,21 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ open, onOpenC
                 <Input
                   id="create_phone"
                   type="text"
-                  placeholder="Enter phone number"
+                  placeholder="Enter 10-digit phone number"
                   value={data.phone}
-                  onChange={(e) => setData('phone', e.target.value)}
+                  onChange={handlePhoneChange}
+                  required
+                  maxLength={10}
                   className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
                 />
                 {errors.phone && (
                   <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+                )}
+                {data.phone && data.phone.length !== 10 && (
+                  <p className="text-red-500 text-xs mt-1">Phone number must be exactly 10 digits</p>
+                )}
+                {data.phone && data.phone.length > 0 && (
+                  <p className="text-gray-500 text-xs mt-1">{data.phone.length}/10 digits</p>
                 )}
               </div>
 
@@ -115,8 +137,8 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ open, onOpenC
               </div>
 
               <div className="flex items-center gap-2">
-                <Checkbox 
-                  id="create_active" 
+                <Checkbox
+                  id="create_active"
                   defaultChecked={true}
                   className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500 bg-white"
                 />
@@ -128,18 +150,18 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ open, onOpenC
 
             {/* Buttons */}
             <div className="flex justify-end gap-3 mt-6">
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 variant="ghost"
                 onClick={() => onOpenChange(false)}
                 className="px-6 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 font-medium"
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                disabled={processing} 
-                className="px-6 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg font-medium"
+              <Button
+                type="submit"
+                disabled={processing || (data.phone && data.phone.length !== 10)}
+                className="px-6 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Create Customer
               </Button>
