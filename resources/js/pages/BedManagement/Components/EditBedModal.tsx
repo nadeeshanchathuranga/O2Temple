@@ -52,6 +52,10 @@ const EditBedModal: React.FC<EditBedModalProps> = ({ open, onOpenChange, bed, on
           onOpenChange(false);
           reset();
         },
+        onError: (errors) => {
+          // Errors are automatically handled by Inertia and displayed in the form
+          console.log('Validation errors:', errors);
+        },
       });
     }
   };
@@ -109,7 +113,7 @@ const EditBedModal: React.FC<EditBedModalProps> = ({ open, onOpenChange, bed, on
                 <select
                   id="edit_status"
                   value={data.status}
-                  onChange={(e) => setData('status', e.target.value)}
+                  onChange={(e) => setData('status', e.target.value as 'available' | 'occupied' | 'maintenance')}
                   className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white text-gray-900"
                 >
                   <option value="available">Available</option>
@@ -127,7 +131,7 @@ const EditBedModal: React.FC<EditBedModalProps> = ({ open, onOpenChange, bed, on
                 type="button"
                 variant="outline"
                 onClick={handleClose}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 text-gray-700 border-gray-300 hover:bg-gray-50 hover:text-gray-900 focus:ring-2 focus:ring-gray-200"
               >
                 Cancel
               </Button>

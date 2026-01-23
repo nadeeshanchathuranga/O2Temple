@@ -48,6 +48,15 @@ const dashboardModules = [
         textColor: 'text-white',
         href: '/packages'
     },
+     {
+        id: 'booking-management',
+        title: 'BOOKING MANAGEMENT',
+        description: 'Manage therapy session bookings and schedules',
+        icon: Calendar,
+        color: 'bg-gradient-to-br from-yellow-400 to-yellow-600',
+        textColor: 'text-white',
+        href: '/bookings'
+    },
     {
         id: 'customer-management',
         title: 'CUSTOMER MANAGEMENT',

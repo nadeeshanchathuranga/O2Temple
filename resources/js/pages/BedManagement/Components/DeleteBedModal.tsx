@@ -98,7 +98,7 @@ const DeleteBedModal: React.FC<DeleteBedModalProps> = ({ open, onOpenChange, bed
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 text-gray-700 border-gray-300 hover:bg-gray-50 hover:text-gray-900 focus:ring-2 focus:ring-gray-200"
               >
                 Cancel
               </Button>

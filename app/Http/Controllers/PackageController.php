@@ -25,7 +25,7 @@ class PackageController extends Controller
 
         $package = Package::create($data);
 
-        return response()->json(['package' => $package], 201);
+        return redirect()->route('packages.index')->with('success', 'Package created successfully.');
     }
 
     public function update(Request $request, Package $package)
@@ -38,13 +38,13 @@ class PackageController extends Controller
 
         $package->update($data);
 
-        return response()->json(['package' => $package]);
+        return redirect()->route('packages.index')->with('success', 'Package updated successfully.');
     }
 
     public function destroy(Package $package)
     {
         $package->delete();
 
-        return response()->json(['success' => true]);
+        return redirect()->route('packages.index')->with('success', 'Package deleted successfully.');
     }
 }

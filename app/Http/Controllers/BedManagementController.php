@@ -19,16 +19,23 @@ class BedManagementController extends Controller
 
     public function store(Request $request)
     {
-
-
         $data = $request->validate([
-            'bed_number' => 'required|string|max:255',
+            'bed_number' => 'required|string|max:255|unique:beds,bed_number',
             'status' => 'required|string|in:available,occupied,maintenance',
+        ], [
+            'bed_number.required' => 'Bed number is required.',
+            'bed_number.unique' => 'This bed number already exists. Please choose a different bed number.',
+            'bed_number.max' => 'Bed number cannot exceed 255 characters.',
+            'status.required' => 'Status is required.',
+            'status.in' => 'Status must be one of: available, occupied, or maintenance.',
         ]);
 
-        Bed::create($data);
-
-        return redirect()->route('beds.index');
+        try {
+            $bed = Bed::create($data);
+            return redirect()->route('beds.index')->with('success', 'Bed created successfully.');
+        } catch (\Exception $e) {
+            return redirect()->back()->withErrors(['bed_number' => 'Unable to create bed. Please try again.'])->withInput();
+        }
     }
 
 
@@ -38,13 +45,22 @@ class BedManagementController extends Controller
     public function update(Request $request, Bed $bed)
     {
         $data = $request->validate([
-            'bed_number' => 'required|string|max:255',
+            'bed_number' => 'required|string|max:255|unique:beds,bed_number,' . $bed->id,
             'status' => 'required|string|in:available,occupied,maintenance',
+        ], [
+            'bed_number.required' => 'Bed number is required.',
+            'bed_number.unique' => 'This bed number already exists. Please choose a different bed number.',
+            'bed_number.max' => 'Bed number cannot exceed 255 characters.',
+            'status.required' => 'Status is required.',
+            'status.in' => 'Status must be one of: available, occupied, or maintenance.',
         ]);
 
-        $bed->update($data);
-
-        return redirect()->route('beds.index');
+        try {
+            $bed->update($data);
+            return redirect()->route('beds.index')->with('success', 'Bed updated successfully.');
+        } catch (\Exception $e) {
+            return redirect()->back()->withErrors(['bed_number' => 'Unable to update bed. Please try again.'])->withInput();
+        }
     }
 
     public function destroy(Bed $bed)
