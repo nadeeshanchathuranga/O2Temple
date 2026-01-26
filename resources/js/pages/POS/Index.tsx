@@ -1420,6 +1420,49 @@ const POSBilling: React.FC<Props> = ({
                 placeholder="Enter email address"
               />
             </div>
+            <div>
+              <Label>NIC</Label>
+              <Input
+                value={customerForm.nic || ''}
+                onChange={(e) => setCustomerForm({ ...customerForm, nic: e.target.value })}
+                placeholder="Enter NIC number"
+              />
+            </div>
+            <div>
+              <Label>Address</Label>
+              <Input
+                value={customerForm.address || ''}
+                onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
+                placeholder="Enter address"
+              />
+            </div>
+            <div>
+              <Label>Age</Label>
+              <Input
+                type="number"
+                min="0"
+                value={customerForm.age || ''}
+                onChange={(e) => setCustomerForm({ ...customerForm, age: e.target.value.replace(/\D/g, '') })}
+                placeholder="Enter age"
+              />
+            </div>
+            <div>
+              <Label>Date of Birth</Label>
+              <Input
+                type="date"
+                value={customerForm.dob || ''}
+                onChange={(e) => setCustomerForm({ ...customerForm, dob: e.target.value })}
+                placeholder="Select date of birth"
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Input
+                value={customerForm.description || ''}
+                onChange={(e) => setCustomerForm({ ...customerForm, description: e.target.value })}
+                placeholder="Enter description"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" className="border-gray-300 text-gray-700 hover:bg-gray-50" onClick={() => setShowCustomerModal(false)}>Cancel</Button>
