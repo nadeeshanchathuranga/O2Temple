@@ -16,7 +16,7 @@ interface DashboardProps {
     user: {
         name: string;
         email: string;
-        role: string;
+        role: string | { name: string };
     };
 }
 
@@ -87,13 +87,30 @@ const dashboardModules = [
 ];
 
 export default function Dashboard({ user }: DashboardProps) {
+    // Filter modules based on user role
+    const getVisibleModules = () => {
+        // Check for different role formats: 'cashier', 'Cashier', or role object
+        const userRole = typeof user.role === 'string' ? user.role.toLowerCase() : user.role?.name?.toLowerCase();
+        
+        if (userRole === 'cashier') {
+            // Cashiers only see POS Billing and Booking Management
+            return dashboardModules.filter(module => 
+                module.id === 'pos-billing' || module.id === 'booking-management'
+            );
+        }
+        // Admins and other roles see all modules
+        return dashboardModules;
+    };
+
+    const visibleModules = getVisibleModules();
+
     return (
         <HeaderLayout user={user}>
             <Head title="O2 Temple Dashboard" />
 
             {/* Dashboard Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {dashboardModules.map((module) => {
+                {visibleModules.map((module) => {
                     const IconComponent = module.icon;
                     const ModuleCard = (
                         <div
