@@ -9,11 +9,7 @@ import {
   MagnifyingGlassIcon, 
   ArrowLeftIcon,
   CalendarIcon,
-  ClockIcon,
-  CheckCircleIcon,
   XCircleIcon,
-  PlayCircleIcon,
-  PauseCircleIcon
 } from '@heroicons/react/24/outline';
 
 interface Booking {
@@ -35,7 +31,7 @@ interface Booking {
   };
   start_time: string;
   end_time: string;
-  status: 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
   payment_status: 'pending' | 'paid' | 'refunded';
   created_at: string;
 }
@@ -87,20 +83,11 @@ const BookingManagement: React.FC<Props> = ({ bookings, filters }) => {
     });
   };
 
-  const handleStatusChange = (bookingId: number, newStatus: string) => {
-    router.patch(`/bookings/${bookingId}/status`, {
-      status: newStatus,
-    }, {
-      preserveState: true,
-      onSuccess: () => {
-        // Optionally show a success message
-      },
-    });
-  };
-
-  const handleDelete = (bookingId: number) => {
-    if (confirm('Are you sure you want to delete this booking?')) {
-      router.delete(`/bookings/${bookingId}`, {
+  const handleCancelBooking = (bookingId: number) => {
+    if (confirm('Are you sure you want to cancel this booking? The bed will become available.')) {
+      router.patch(`/bookings/${bookingId}/status`, {
+        status: 'cancelled',
+      }, {
         preserveState: true,
       });
     }
@@ -108,13 +95,14 @@ const BookingManagement: React.FC<Props> = ({ bookings, filters }) => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
+      pending: { label: 'Pending', className: 'bg-orange-100 text-orange-700' },
       confirmed: { label: 'Confirmed', className: 'bg-blue-100 text-blue-700' },
       in_progress: { label: 'In Progress', className: 'bg-yellow-100 text-yellow-700' },
       completed: { label: 'Completed', className: 'bg-green-100 text-green-700' },
       cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-700' },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.confirmed;
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
     return <Badge className={config.className}>{config.label}</Badge>;
   };
 
@@ -146,6 +134,11 @@ const BookingManagement: React.FC<Props> = ({ bookings, filters }) => {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  // Check if booking can be cancelled (not yet started or in progress without payment)
+  const canCancel = (booking: Booking) => {
+    return booking.status !== 'completed' && booking.status !== 'cancelled';
   };
 
   return (
@@ -201,6 +194,7 @@ const BookingManagement: React.FC<Props> = ({ bookings, filters }) => {
                     className="border border-gray-300 rounded-lg px-3 py-2 focus:border-yellow-500 focus:ring-yellow-500 bg-white text-gray-900"
                   >
                     <option value="">All Status</option>
+                    <option value="pending">Pending</option>
                     <option value="confirmed">Confirmed</option>
                     <option value="in_progress">In Progress</option>
                     <option value="completed">Completed</option>
@@ -233,14 +227,13 @@ const BookingManagement: React.FC<Props> = ({ bookings, filters }) => {
             </div>
 
             {/* Table Header */}
-            <div className="grid grid-cols-7 gap-4 px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="grid grid-cols-6 gap-4 px-6 py-4 bg-gray-50 border-b border-gray-200">
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">CUSTOMER</div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">BED</div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">PACKAGE</div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">START TIME</div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">END TIME</div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">STATUS</div>
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">ACTIONS</div>
             </div>
 
             {/* Table Body */}
@@ -253,7 +246,7 @@ const BookingManagement: React.FC<Props> = ({ bookings, filters }) => {
                 </div>
               ) : (
                 bookings.data.map((booking) => (
-                  <div key={booking.id} className="grid grid-cols-7 gap-4 px-6 py-4 items-center hover:bg-gray-50 transition-colors">
+                  <div key={booking.id} className="grid grid-cols-6 gap-4 px-6 py-4 items-center hover:bg-gray-50 transition-colors">
                     <div>
                       <div className="font-medium text-gray-900">{booking.customer.name}</div>
                       <div className="text-sm text-gray-500">{booking.customer.phone}</div>
@@ -279,46 +272,21 @@ const BookingManagement: React.FC<Props> = ({ bookings, filters }) => {
                     </div>
 
                     <div className="flex flex-col gap-1">
-                      {getStatusBadge(booking.status)}
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(booking.status)}
+                        {canCancel(booking) && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleCancelBooking(booking.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1"
+                            title="Cancel Booking"
+                          >
+                            <XCircleIcon className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                       {getPaymentBadge(booking.payment_status)}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {booking.status === 'confirmed' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleStatusChange(booking.id, 'in_progress')}
-                          className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
-                          title="Start Session"
-                        >
-                          <PlayCircleIcon className="w-4 h-4" />
-                        </Button>
-                      )}
-
-                      {booking.status === 'in_progress' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleStatusChange(booking.id, 'completed')}
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                          title="Complete Session"
-                        >
-                          <CheckCircleIcon className="w-4 h-4" />
-                        </Button>
-                      )}
-
-                      {(booking.status === 'confirmed' || booking.status === 'in_progress') && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleStatusChange(booking.id, 'cancelled')}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          title="Cancel Booking"
-                        >
-                          <XCircleIcon className="w-4 h-4" />
-                        </Button>
-                      )}
                     </div>
                   </div>
                 ))

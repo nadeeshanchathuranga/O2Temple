@@ -65,6 +65,7 @@ class Bed extends Model
             ->where('start_time', '<=', now())
             ->where('end_time', '>=', now())
             ->whereIn('status', ['confirmed', 'in_progress'])
+            ->where('payment_status', 'paid')
             ->first();
     }
 
@@ -100,6 +101,7 @@ class Bed extends Model
             ->where('start_time', '>', now())
             ->where('start_time', '<=', now()->addMinutes(30))
             ->whereIn('status', ['confirmed', 'in_progress'])
+            ->where('payment_status', 'paid')
             ->first();
 
         if ($upcomingAllocation) {

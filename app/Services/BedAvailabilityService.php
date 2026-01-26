@@ -14,7 +14,41 @@ class BedAvailabilityService
      */
     public function getAllBedsWithStatus(): Collection
     {
-        return Bed::available()->orderByGrid()->get()->map(function ($bed) {
+        $now = now();
+        
+        // Get all current allocations in one query
+        // Only consider allocations with paid payment status
+        $currentAllocations = BedAllocation::with(['customer', 'package'])
+            ->where('start_time', '<=', $now)
+            ->where('end_time', '>=', $now)
+            ->whereIn('status', ['confirmed', 'in_progress'])
+            ->where('payment_status', 'paid')
+            ->get()
+            ->keyBy('bed_id');
+        
+        // Get upcoming allocations in the next 30 minutes
+        $upcomingAllocations = BedAllocation::with(['customer', 'package'])
+            ->where('start_time', '>', $now)
+            ->where('start_time', '<=', $now->copy()->addMinutes(30))
+            ->whereIn('status', ['confirmed', 'in_progress'])
+            ->where('payment_status', 'paid')
+            ->get()
+            ->keyBy('bed_id');
+        
+        return Bed::available()->orderByGrid()->get()->map(function ($bed) use ($currentAllocations, $upcomingAllocations) {
+            $currentAllocation = $currentAllocations->get($bed->id);
+            $upcomingAllocation = $upcomingAllocations->get($bed->id);
+            
+            // Determine status
+            $status = 'available';
+            if ($bed->status === 'maintenance') {
+                $status = 'maintenance';
+            } elseif ($currentAllocation) {
+                $status = 'occupied';
+            } elseif ($upcomingAllocation) {
+                $status = 'booked_soon';
+            }
+            
             return [
                 'id' => $bed->id,
                 'bed_number' => $bed->bed_number,
@@ -22,8 +56,8 @@ class BedAvailabilityService
                 'grid_row' => $bed->grid_row,
                 'grid_col' => $bed->grid_col,
                 'bed_type' => $bed->bed_type,
-                'status' => $bed->getAvailabilityStatus(),
-                'current_allocation' => $bed->getCurrentAllocation()?->load(['customer', 'package']),
+                'status' => $status,
+                'current_allocation' => $currentAllocation,
             ];
         });
     }
@@ -205,5 +239,49 @@ class BedAvailabilityService
                 'notes' => ($allocation->notes ? $allocation->notes . ' | ' : '') . 'Auto-cancelled: No payment received within 15 minutes.'
             ]);
         }
+        
+        // Update bed table status based on paid allocations
+        $this->updateBedTableStatuses();
+    }
+    
+    /**
+     * Update the status column in the beds table based on paid allocations.
+     */
+    public function updateBedTableStatuses(): void
+    {
+        $now = now();
+        
+        // Get all current paid allocations
+        $currentAllocations = BedAllocation::where('start_time', '<=', $now)
+            ->where('end_time', '>=', $now)
+            ->whereIn('status', ['confirmed', 'in_progress'])
+            ->where('payment_status', 'paid')
+            ->pluck('bed_id')
+            ->unique();
+        
+        // Get upcoming paid allocations (within 30 minutes)
+        $upcomingAllocations = BedAllocation::where('start_time', '>', $now)
+            ->where('start_time', '<=', $now->copy()->addMinutes(30))
+            ->whereIn('status', ['confirmed', 'in_progress'])
+            ->where('payment_status', 'paid')
+            ->pluck('bed_id')
+            ->unique();
+        
+        // Update beds to 'occupied' if they have current paid allocations
+        Bed::whereIn('id', $currentAllocations)
+            ->where('status', '!=', 'maintenance')
+            ->update(['status' => 'occupied']);
+        
+        // Update beds to 'booked_soon' if they have upcoming paid allocations (but not currently occupied)
+        Bed::whereIn('id', $upcomingAllocations)
+            ->whereNotIn('id', $currentAllocations)
+            ->where('status', '!=', 'maintenance')
+            ->update(['status' => 'booked_soon']);
+        
+        // Update beds to 'available' if they have no current or upcoming paid allocations
+        $busyBedIds = $currentAllocations->merge($upcomingAllocations)->unique();
+        Bed::whereNotIn('id', $busyBedIds)
+            ->where('status', '!=', 'maintenance')
+            ->update(['status' => 'available']);
     }
 }

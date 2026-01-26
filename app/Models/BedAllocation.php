@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 
 class BedAllocation extends Model
 {
@@ -154,7 +155,7 @@ class BedAllocation extends Model
     /**
      * Scope to get active bookings for a bed at a specific time range
      */
-    public function scopeConflictsWith($query, int $bedId, Carbon $startTime, Carbon $endTime, ?int $excludeId = null)
+    public function scopeConflictsWith($query, int $bedId, CarbonInterface $startTime, CarbonInterface $endTime, ?int $excludeId = null)
     {
         return $query->where('bed_id', $bedId)
             ->where('status', '!=', 'cancelled')

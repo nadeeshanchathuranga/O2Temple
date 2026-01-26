@@ -43,15 +43,6 @@ interface Package {
   price: number;
 }
 
-interface Product {
-  id: number;
-  name: string;
-  sku: string;
-  category: string;
-  price: number;
-  description?: string;
-}
-
 interface Customer {
   id: number;
   name: string;
@@ -143,7 +134,6 @@ interface Invoice {
 interface Props {
   beds: Bed[];
   packages: Package[];
-  products: Product[];
   customers: Customer[];
   activeInvoice?: Invoice | null;
   selectedBedId?: number | null;
@@ -152,7 +142,6 @@ interface Props {
 const POSBilling: React.FC<Props> = ({ 
   beds: initialBeds,
   packages, 
-  products, 
   customers: initialCustomers,
   activeInvoice: initialInvoice,
   selectedBedId: initialSelectedBedId,
@@ -171,7 +160,6 @@ const POSBilling: React.FC<Props> = ({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<string>('all');
   
   // Customer form
   const [customerForm, setCustomerForm] = useState({ name: '', phone: '', email: '' });
@@ -198,14 +186,6 @@ const POSBilling: React.FC<Props> = ({
   const [bookingSearchQuery, setBookingSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Booking[]>([]);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
-
-  // Get unique product categories
-  const categories = ['all', ...new Set(products.map(p => p.category))];
-
-  // Filter products by category
-  const filteredProducts = activeCategory === 'all' 
-    ? products 
-    : products.filter(p => p.category === activeCategory);
 
   // Search bookings
   const handleBookingSearch = useCallback(async (query: string) => {
@@ -251,7 +231,7 @@ const POSBilling: React.FC<Props> = ({
     }
   };
 
-  // Add item to invoice
+  // Add item to invoice (packages only)
   const handleAddItem = async (itemType: string, itemId: number, quantity: number = 1) => {
     if (!invoice) {
       if (!selectedCustomer) {
@@ -269,7 +249,7 @@ const POSBilling: React.FC<Props> = ({
         // Now add item to the new invoice
         const itemResponse = await axios.post(`/pos/invoices/${response.data.invoice.id}/items`, {
           item_type: itemType,
-          [itemType === 'package' ? 'package_id' : 'product_id']: itemId,
+          package_id: itemId,
           quantity,
         });
         setInvoice(itemResponse.data.invoice);
@@ -282,7 +262,7 @@ const POSBilling: React.FC<Props> = ({
     try {
       const response = await axios.post(`/pos/invoices/${invoice.id}/items`, {
         item_type: itemType,
-        [itemType === 'package' ? 'package_id' : 'product_id']: itemId,
+        package_id: itemId,
         quantity,
       });
       setInvoice(response.data.invoice);
@@ -380,6 +360,19 @@ const POSBilling: React.FC<Props> = ({
         setCashAmount(0);
         setCardAmount(0);
         setCardReference('');
+        
+        // Update beds list if provided
+        if (response.data.beds) {
+          setBeds(response.data.beds);
+          
+          // Update selected bed if it exists
+          if (selectedBed) {
+            const updatedBed = response.data.beds.find((b: Bed) => b.id === selectedBed.id);
+            if (updatedBed) {
+              setSelectedBed(updatedBed);
+            }
+          }
+        }
         
         if (response.data.invoice.payment_status === 'paid') {
           alert('Payment completed successfully!');
@@ -511,7 +504,7 @@ const POSBilling: React.FC<Props> = ({
         bed_id: selectedBed.id,
         customer_id: parseInt(bookingForm.customer_id),
         package_id: parseInt(bookingForm.package_id),
-        start_time: `${bookingForm.date} ${bookingForm.start_time}`,
+        start_now: true, // Use server's current time for POS walk-in bookings
       });
       
       if (response.data.success) {
@@ -605,6 +598,19 @@ const POSBilling: React.FC<Props> = ({
       if (response.data.success) {
         setInvoice(response.data.invoice);
         
+        // Update beds list if provided
+        if (response.data.beds) {
+          setBeds(response.data.beds);
+          
+          // Update selected bed if it exists
+          if (selectedBed) {
+            const updatedBed = response.data.beds.find((b: Bed) => b.id === selectedBed.id);
+            if (updatedBed) {
+              setSelectedBed(updatedBed);
+            }
+          }
+        }
+        
         if (response.data.invoice.payment_status === 'paid') {
           alert('Payment completed successfully! You can now print the bill.');
         }
@@ -673,7 +679,7 @@ const POSBilling: React.FC<Props> = ({
           </div>
 
           <div className="grid grid-cols-12 gap-6">
-            {/* Left Panel - Beds, Products & Packages */}
+            {/* Left Panel - Beds & Packages */}
             <div className="col-span-7 space-y-4">
               
               {/* Bed Selection Section */}
@@ -781,102 +787,78 @@ const POSBilling: React.FC<Props> = ({
                 )}
               </div>
 
-              {/* Products & Packages Section */}
+              {/* Packages Section - For new bookings */}
               <div className="bg-white rounded-lg shadow-sm">
-                {/* Category Tabs */}
                 <div className="p-4 border-b border-gray-200">
-                  <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                    {categories.map((category) => (
-                      <button
-                        key={category}
-                        onClick={() => setActiveCategory(category)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                          activeCategory === category
-                            ? 'bg-teal-500 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {category === 'all' ? 'All Items' : category}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setActiveCategory('packages')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                        activeCategory === 'packages'
-                          ? 'bg-yellow-500 text-white'
-                          : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                      }`}
-                    >
-                      🎁 Packages
-                    </button>
-                  </div>
+                  <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                    🎁 <span>Packages</span>
+                    <span className="text-xs text-gray-500 font-normal ml-2">Select a package to create a new booking</span>
+                  </h2>
                 </div>
 
-                {/* Products Grid */}
                 <div className="p-4">
-                  {activeCategory === 'packages' ? (
-                    <div className="grid grid-cols-3 gap-4">
-                      {packages.map((pkg) => (
-                        <button
-                          key={pkg.id}
-                          onClick={() => handlePackageSelectForBooking(pkg)}
-                          className={`p-4 border-2 rounded-xl text-left transition-all group ${
-                            selectedPackageForBooking?.id === pkg.id
-                              ? 'border-teal-500 bg-teal-50'
-                              : 'border-yellow-200 hover:border-yellow-400 hover:bg-yellow-50'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <h3 className={`font-semibold ${
-                                selectedPackageForBooking?.id === pkg.id
-                                  ? 'text-teal-700'
-                                  : 'text-gray-900 group-hover:text-yellow-700'
-                              }`}>{pkg.name}</h3>
-                              <p className="text-sm text-gray-500 flex items-center mt-1">
-                                <ClockIcon className="w-4 h-4 mr-1" />
-                                {pkg.duration_minutes} min
-                              </p>
-                            </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    {packages.map((pkg) => (
+                      <button
+                        key={pkg.id}
+                        onClick={() => handlePackageSelectForBooking(pkg)}
+                        className={`p-4 border-2 rounded-xl text-left transition-all group ${
+                          selectedPackageForBooking?.id === pkg.id
+                            ? 'border-teal-500 bg-teal-50'
+                            : 'border-yellow-200 hover:border-yellow-400 hover:bg-yellow-50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className={`font-semibold ${
+                              selectedPackageForBooking?.id === pkg.id
+                                ? 'text-teal-700'
+                                : 'text-gray-900 group-hover:text-yellow-700'
+                            }`}>{pkg.name}</h3>
+                            <p className="text-sm text-gray-500 flex items-center mt-1">
+                              <ClockIcon className="w-4 h-4 mr-1" />
+                              {pkg.duration_minutes} min
+                            </p>
                           </div>
-                          <div className={`mt-3 text-lg font-bold ${
-                            selectedPackageForBooking?.id === pkg.id
-                              ? 'text-teal-600'
-                              : 'text-yellow-600'
-                          }`}>
-                            {formatCurrency(pkg.price)}
-                          </div>
-                          {selectedPackageForBooking?.id === pkg.id && (
-                            <div className="mt-2 text-xs text-teal-600 font-medium">
-                              ✓ Selected - Click a bed to assign
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-4 gap-3">
-                      {filteredProducts.map((product) => (
-                        <button
-                          key={product.id}
-                          onClick={() => handleAddItem('product', product.id)}
-                          className="p-3 border border-gray-200 rounded-lg text-left hover:border-teal-400 hover:bg-teal-50 transition-all group"
-                        >
-                          <h3 className="font-medium text-gray-900 text-sm group-hover:text-teal-700 line-clamp-2">{product.name}</h3>
-                          <p className="text-xs text-gray-500 mt-1">{product.category}</p>
-                          <div className="mt-2 text-sm font-semibold text-teal-600">
-                            {formatCurrency(product.price)}
-                          </div>
-                        </button>
-                      ))}
-                      {filteredProducts.length === 0 && (
-                        <div className="col-span-4 py-12 text-center text-gray-500">
-                          <ShoppingCartIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                          <p>No products in this category</p>
                         </div>
-                      )}
+                        <div className={`mt-3 text-lg font-bold ${
+                          selectedPackageForBooking?.id === pkg.id
+                            ? 'text-teal-600'
+                            : 'text-yellow-600'
+                        }`}>
+                          {formatCurrency(pkg.price)}
+                        </div>
+                        {selectedPackageForBooking?.id === pkg.id && (
+                          <div className="mt-2 text-xs text-teal-600 font-medium">
+                            ✓ Selected - Click a bed to assign
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  {packages.length === 0 && (
+                    <div className="py-12 text-center text-gray-500">
+                      <ShoppingCartIcon className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p>No packages available</p>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Services Section - Available as add-ons */}
+              <div className="bg-white rounded-lg shadow-sm">
+                <div className="p-4 border-b border-gray-200">
+                  <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                    🛎️ <span>Services</span>
+                    <span className="text-xs text-gray-500 font-normal ml-2">Add-on services (select after loading a booking)</span>
+                  </h2>
+                </div>
+
+                <div className="p-4">
+                  <div className="text-center py-8 text-gray-400">
+                    <p className="text-sm">Services are added through Booking Management</p>
+                    <p className="text-xs mt-2">Use "Find Booking" to load existing bookings with services</p>
+                  </div>
                 </div>
               </div>
             </div>

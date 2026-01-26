@@ -6,6 +6,7 @@ use App\Models\BedAllocation;
 use App\Models\Bed;
 use App\Models\Package;
 use App\Models\Customer;
+use App\Services\BedAvailabilityService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -152,7 +153,7 @@ class BookingController extends Controller
             'package_id' => $validated['package_id'],
             'start_time' => $validated['start_time'],
             'end_time' => $validated['end_time'],
-            'status' => 'confirmed',
+            'status' => 'pending', // Bookings from Booking Management start as pending
             'payment_status' => 'pending',
         ]);
 
@@ -165,12 +166,36 @@ class BookingController extends Controller
     public function updateStatus(Request $request, BedAllocation $booking)
     {
         $validated = $request->validate([
-            'status' => 'required|in:confirmed,in_progress,completed,cancelled',
+            'status' => 'required|in:pending,confirmed,in_progress,completed,cancelled',
         ]);
 
         $booking->update(['status' => $validated['status']]);
+        
+        // Update bed status in database immediately
+        $bedAvailabilityService = new BedAvailabilityService();
+        $bedAvailabilityService->updateBedTableStatuses();
 
         return back()->with('success', 'Booking status updated successfully!');
+    }
+
+    /**
+     * Update the specified booking payment status.
+     */
+    public function updatePaymentStatus(Request $request, BedAllocation $booking)
+    {
+        $validated = $request->validate([
+            'payment_status' => 'required|in:pending,paid',
+        ]);
+
+        $booking->update(['payment_status' => $validated['payment_status']]);
+        
+        // If paid, also update bed status in database
+        if ($validated['payment_status'] === 'paid') {
+            $bedAvailabilityService = new BedAvailabilityService();
+            $bedAvailabilityService->updateBedTableStatuses();
+        }
+
+        return back()->with('success', 'Payment status updated successfully!');
     }
 
     /**
@@ -178,7 +203,12 @@ class BookingController extends Controller
      */
     public function destroy(BedAllocation $booking)
     {
+        $bedId = $booking->bed_id;
         $booking->delete();
+        
+        // Update bed status in database
+        $bedAvailabilityService = new BedAvailabilityService();
+        $bedAvailabilityService->updateBedTableStatuses();
 
         return back()->with('success', 'Booking deleted successfully!');
     }

@@ -56,6 +56,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('bookings', [\App\Http\Controllers\BookingController::class, 'store'])->name('bookings.store');
     Route::get('bookings/available-slots', [\App\Http\Controllers\BookingController::class, 'getAvailableSlots'])->name('bookings.available-slots');
     Route::patch('bookings/{booking}/status', [\App\Http\Controllers\BookingController::class, 'updateStatus'])->name('bookings.update-status');
+    Route::patch('bookings/{booking}/payment-status', [\App\Http\Controllers\BookingController::class, 'updatePaymentStatus'])->name('bookings.update-payment-status');
     Route::delete('bookings/{booking}', [\App\Http\Controllers\BookingController::class, 'destroy'])->name('bookings.destroy');
 });
 

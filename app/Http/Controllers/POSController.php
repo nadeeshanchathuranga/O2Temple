@@ -22,38 +22,10 @@ class POSController extends Controller
      */
     public function index(Request $request)
     {
-        // Get ALL beds to show availability status (green/red)
-        $beds = Bed::orderByGrid()->get()->map(function ($bed) {
-            $currentAllocation = $bed->getCurrentAllocation();
-            return [
-                'id' => $bed->id,
-                'bed_number' => $bed->bed_number,
-                'display_name' => $bed->display_name ?? 'Bed ' . $bed->bed_number,
-                'grid_row' => $bed->grid_row,
-                'grid_col' => $bed->grid_col,
-                'bed_type' => $bed->bed_type,
-                'status' => $bed->getAvailabilityStatus(),
-                'current_allocation' => $currentAllocation ? [
-                    'id' => $currentAllocation->id,
-                    'booking_number' => $currentAllocation->booking_number,
-                    'customer' => $currentAllocation->customer ? [
-                        'id' => $currentAllocation->customer->id,
-                        'name' => $currentAllocation->customer->name,
-                        'phone' => $currentAllocation->customer->phone,
-                    ] : null,
-                    'package' => $currentAllocation->package ? [
-                        'id' => $currentAllocation->package->id,
-                        'name' => $currentAllocation->package->name,
-                    ] : null,
-                    'start_time' => $currentAllocation->start_time->format('H:i'),
-                    'end_time' => $currentAllocation->end_time->format('H:i'),
-                    'time_remaining' => $currentAllocation->end_time->diffForHumans(now(), ['parts' => 1]),
-                ] : null,
-            ];
-        });
+        // Use the optimized method to get beds with status
+        $beds = $this->getBedsWithStatus();
 
         $packages = Package::orderBy('name')->get();
-        $products = Product::active()->orderBy('category')->orderBy('name')->get();
         $customers = Customer::orderBy('name')->get();
 
         // Get active invoice for selected bed if any
@@ -72,7 +44,6 @@ class POSController extends Controller
         return Inertia::render('POS/Index', [
             'beds' => $beds,
             'packages' => $packages,
-            'products' => $products,
             'customers' => $customers,
             'activeInvoice' => $activeInvoice,
             'selectedBedId' => $selectedBedId,
@@ -246,14 +217,21 @@ class POSController extends Controller
             'customer_id' => 'required|exists:customers,id',
             'bed_id' => 'required|exists:beds,id',
             'package_id' => 'required|exists:packages,id',
-            'start_time' => 'required|date',
+            'start_time' => 'nullable|date',
             'end_time' => 'nullable|date|after:start_time',
+            'start_now' => 'boolean', // If true, use server's current time
             'notes' => 'nullable|string',
             'create_invoice' => 'boolean',
         ]);
 
         $package = Package::findOrFail($validated['package_id']);
-        $startTime = Carbon::parse($validated['start_time']);
+        
+        // Use server's current time if start_now is true, otherwise parse the provided time
+        if ($request->get('start_now', false)) {
+            $startTime = now();
+        } else {
+            $startTime = Carbon::parse($validated['start_time'] ?? now());
+        }
         
         // Calculate end time from package duration if not provided
         $endTime = isset($validated['end_time']) 
@@ -289,6 +267,8 @@ class POSController extends Controller
                 'notes' => $validated['notes'] ?? null,
                 'created_by' => auth()->id(),
             ]);
+            
+            \Log::info("Booking created: #{$booking->id}, bed={$booking->bed_id}, start={$startTime}, end={$endTime}");
 
             // Create invoice if requested
             if ($request->get('create_invoice', false)) {
@@ -542,23 +522,50 @@ class POSController extends Controller
                 );
             }
 
+            // Refresh the invoice to get updated balance_amount after payments
+            $invoice->refresh();
+            
+            // Load the allocation relationship
+            $invoice->load('allocation');
+            
+            \Log::info("Payment processed for invoice #{$invoice->id}, balance: {$invoice->balance_amount}");
+
             // If fully paid, mark invoice and booking as completed
             if ($invoice->balance_amount <= 0) {
                 $invoice->markAsCompleted(auth()->id());
+                
+                \Log::info("Invoice #{$invoice->id} marked as completed");
 
                 if ($invoice->allocation) {
+                    $allocationId = $invoice->allocation->id;
+                    $bedId = $invoice->allocation->bed_id;
+                    
+                    // Update allocation status
                     $invoice->allocation->update([
                         'payment_status' => 'paid',
+                        'status' => 'in_progress',
                     ]);
+                    
+                    \Log::info("Allocation #{$allocationId} updated: payment_status=paid, status=in_progress");
+                    \Log::info("Allocation details: start_time={$invoice->allocation->start_time}, end_time={$invoice->allocation->end_time}");
+                    
+                    // Update bed status in database immediately
+                    $this->updateBedStatus($bedId);
+                } else {
+                    \Log::warning("Invoice #{$invoice->id} has no allocation linked");
                 }
             }
 
             DB::commit();
 
+            // Get updated beds list with status
+            $beds = $this->getBedsWithStatus();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Payment processed successfully!',
                 'invoice' => $invoice->fresh()->load(['items', 'payments', 'customer', 'allocation']),
+                'beds' => $beds,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -574,6 +581,10 @@ class POSController extends Controller
      */
     public function completeInvoice(Invoice $invoice)
     {
+        // Refresh invoice to get latest balance
+        $invoice->refresh();
+        $invoice->load('allocation');
+        
         if ($invoice->balance_amount > 0) {
             return response()->json([
                 'success' => false,
@@ -588,12 +599,19 @@ class POSController extends Controller
                 'status' => 'completed',
                 'payment_status' => 'paid',
             ]);
+            
+            // Update bed status in database immediately
+            $this->updateBedStatus($invoice->allocation->bed_id);
         }
+
+        // Get updated beds list with status
+        $beds = $this->getBedsWithStatus();
 
         return response()->json([
             'success' => true,
             'message' => 'Invoice completed successfully!',
             'invoice' => $invoice->fresh()->load(['items', 'payments', 'customer']),
+            'beds' => $beds,
         ]);
     }
 
@@ -701,8 +719,39 @@ class POSController extends Controller
      */
     private function getBedsWithStatus()
     {
-        return Bed::orderByGrid()->get()->map(function ($bed) {
-            $currentAllocation = $bed->getCurrentAllocation();
+        // Get all current allocations in one query to avoid N+1
+        // Only consider allocations with paid payment status
+        $now = now();
+        $currentAllocations = BedAllocation::with(['customer', 'package'])
+            ->where('start_time', '<=', $now)
+            ->where('end_time', '>=', $now)
+            ->whereIn('status', ['confirmed', 'in_progress'])
+            ->where('payment_status', 'paid')
+            ->get()
+            ->keyBy('bed_id');
+        
+        $upcomingAllocations = BedAllocation::with(['customer', 'package'])
+            ->where('start_time', '>', $now)
+            ->where('start_time', '<=', $now->copy()->addMinutes(30))
+            ->whereIn('status', ['confirmed', 'in_progress'])
+            ->where('payment_status', 'paid')
+            ->get()
+            ->keyBy('bed_id');
+        
+        return Bed::orderByGrid()->get()->map(function ($bed) use ($currentAllocations, $upcomingAllocations, $now) {
+            $currentAllocation = $currentAllocations->get($bed->id);
+            $upcomingAllocation = $upcomingAllocations->get($bed->id);
+            
+            // Determine status
+            $status = 'available';
+            if ($bed->status === 'maintenance') {
+                $status = 'maintenance';
+            } elseif ($currentAllocation) {
+                $status = 'occupied';
+            } elseif ($upcomingAllocation) {
+                $status = 'booked_soon';
+            }
+            
             return [
                 'id' => $bed->id,
                 'bed_number' => $bed->bed_number,
@@ -710,7 +759,7 @@ class POSController extends Controller
                 'grid_row' => $bed->grid_row,
                 'grid_col' => $bed->grid_col,
                 'bed_type' => $bed->bed_type,
-                'status' => $bed->getAvailabilityStatus(),
+                'status' => $status,
                 'current_allocation' => $currentAllocation ? [
                     'id' => $currentAllocation->id,
                     'booking_number' => $currentAllocation->booking_number,
@@ -725,9 +774,57 @@ class POSController extends Controller
                     ] : null,
                     'start_time' => $currentAllocation->start_time->format('H:i'),
                     'end_time' => $currentAllocation->end_time->format('H:i'),
-                    'time_remaining' => $currentAllocation->end_time->diffForHumans(now(), ['parts' => 1]),
+                    'time_remaining' => $currentAllocation->end_time->diffForHumans($now, ['parts' => 1]),
                 ] : null,
             ];
         });
+    }
+    
+    /**
+     * Update a single bed's status in the database based on its allocations.
+     */
+    private function updateBedStatus(int $bedId): void
+    {
+        $bed = Bed::find($bedId);
+        if (!$bed || $bed->status === 'maintenance') {
+            return;
+        }
+        
+        $now = now();
+        
+        // Log for debugging
+        \Log::info("updateBedStatus called for bed {$bedId} at {$now}");
+        
+        // Check for current paid allocation (booking time includes current time)
+        $currentAllocation = BedAllocation::where('bed_id', $bedId)
+            ->where('start_time', '<=', $now)
+            ->where('end_time', '>=', $now)
+            ->whereIn('status', ['confirmed', 'in_progress'])
+            ->where('payment_status', 'paid')
+            ->first();
+        
+        if ($currentAllocation) {
+            \Log::info("Bed {$bedId} has current allocation #{$currentAllocation->id}, setting to occupied");
+            $bed->update(['status' => 'occupied']);
+            return;
+        }
+        
+        // Check for upcoming paid allocation (within 30 minutes)
+        $upcomingAllocation = BedAllocation::where('bed_id', $bedId)
+            ->where('start_time', '>', $now)
+            ->where('start_time', '<=', $now->copy()->addMinutes(30))
+            ->whereIn('status', ['confirmed', 'in_progress'])
+            ->where('payment_status', 'paid')
+            ->first();
+        
+        if ($upcomingAllocation) {
+            \Log::info("Bed {$bedId} has upcoming allocation #{$upcomingAllocation->id}, setting to booked_soon");
+            $bed->update(['status' => 'booked_soon']);
+            return;
+        }
+        
+        // No paid allocations - set to available
+        \Log::info("Bed {$bedId} has no paid allocations, setting to available");
+        $bed->update(['status' => 'available']);
     }
 }
