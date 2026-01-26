@@ -32,7 +32,7 @@ const dashboardModules = [
     },
     {
         id: 'bed-management',
-        title: 'BED MANAGEMENT',
+        title: 'SEAT MANAGEMENT',
         description: 'Monitor and manage oxygen therapy bed availability and status',
         icon: Bed,
         color: 'bg-gradient-to-br from-teal-400 to-teal-600',

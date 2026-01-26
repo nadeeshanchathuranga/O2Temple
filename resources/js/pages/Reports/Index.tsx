@@ -13,6 +13,7 @@ import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
 } from '@heroicons/react/24/outline';
+import HeaderLayout from '@/layouts/header-layout';
 
 interface DailyRevenue {
   date: string;
@@ -184,7 +185,7 @@ const Reports: React.FC<Props> = ({
     : 0;
 
   return (
-    <>
+    <HeaderLayout>
       <Head title="Reports & Analytics" />
       
       <div className="min-h-screen bg-gray-50">
@@ -199,12 +200,6 @@ const Reports: React.FC<Props> = ({
               >
                 <ArrowLeftIcon className="w-5 h-5 text-gray-600" />
               </Button>
-              
-              <img 
-                src="/jaanNetworklogo.jpeg" 
-                alt="JAAN Network" 
-                className="h-8 w-auto object-contain"
-              />
               
               <h1 className="text-xl font-semibold text-gray-900">Reports & Analytics</h1>
             </div>
@@ -600,7 +595,7 @@ const Reports: React.FC<Props> = ({
           </div>
         </div>
       </div>
-    </>
+    </HeaderLayout>
   );
 };
 

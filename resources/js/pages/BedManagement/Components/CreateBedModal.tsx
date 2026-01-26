@@ -70,12 +70,12 @@ const CreateBedModal: React.FC<CreateBedModalProps> = ({ open, onOpenChange, onS
             <div className="space-y-5 mt-4">
               <div>
                 <Label htmlFor="bed_number" className="text-sm font-medium text-gray-700 mb-2 block">
-                  Bed Number <span className="text-red-500">*</span>
+                  Seat Number <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   id="bed_number"
                   type="text"
-                  placeholder="e.g., BED-001, Room A1"
+                  placeholder="e.g., SEAT-001, Room A1"
                   value={data.bed_number}
                   onChange={(e) => setData('bed_number', e.target.value)}
                   required
