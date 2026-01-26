@@ -166,7 +166,7 @@ const BedManagement: React.FC<Props> = ({ beds: initialBeds }) => {
             </div>
 
             <div className="px-3 py-1.5 bg-teal-500 text-white rounded-lg text-sm font-medium">
-              {beds.length} Beds
+              {beds.length} Seats
             </div>
           </div>
 
@@ -204,7 +204,7 @@ const BedManagement: React.FC<Props> = ({ beds: initialBeds }) => {
                 
                 {/* Filter Summary */}
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <span>Showing {filteredBeds.length} of {beds.length} beds</span>
+                  <span>Showing {filteredBeds.length} of {beds.length} seats</span>
                   {statusFilter !== 'all' && (
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       statusFilter === 'available' ? 'bg-green-100 text-green-700' :
@@ -222,7 +222,7 @@ const BedManagement: React.FC<Props> = ({ beds: initialBeds }) => {
                 onClick={() => setShowCreateModal(true)}
               >
                 <PlusIcon className="w-4 h-4 mr-2" />
-                New Bed
+                New Seat
               </Button>
             </div>
 
@@ -318,14 +318,14 @@ const BedManagement: React.FC<Props> = ({ beds: initialBeds }) => {
                       <path d="M10.5 1.5H3.75A2.25 2.25 0 001.5 3.75v12.5A2.25 2.25 0 003.75 18.5h12.5a2.25 2.25 0 002.25-2.25V9.5M10.5 1.5v4.5m0-4.5L6 6m4.5-4.5L15 6" />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No beds found</h3>
-                  <p className="text-gray-500 mb-4">Get started by adding your first bed.</p>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No seats found</h3>
+                  <p className="text-gray-500 mb-4">Get started by adding your first seat.</p>
                   <Button
                     className="bg-teal-500 hover:bg-teal-600 text-white"
                     onClick={() => setShowCreateModal(true)}
                   >
                     <PlusIcon className="w-4 h-4 mr-2" />
-                    Create First Bed
+                    Create First Seat
                   </Button>
                 </div>
               </div>

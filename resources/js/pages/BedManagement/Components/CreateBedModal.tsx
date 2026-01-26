@@ -54,7 +54,7 @@ const CreateBedModal: React.FC<CreateBedModalProps> = ({ open, onOpenChange, onS
                 <path d="M10.5 1.5H3.75A2.25 2.25 0 001.5 3.75v12.5A2.25 2.25 0 003.75 18.5h12.5a2.25 2.25 0 002.25-2.25V9.5M10.5 1.5v4.5m0-4.5L6 6m4.5-4.5L15 6" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-gray-900">Create Bed</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Create Seats</h2>
             <button
               onClick={() => onOpenChange(false)}
               className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
