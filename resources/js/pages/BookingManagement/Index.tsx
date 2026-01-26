@@ -12,6 +12,7 @@ import {
   XCircleIcon,
   CreditCardIcon,
 } from '@heroicons/react/24/outline';
+import HeaderLayout from '@/layouts/header-layout';
 
 interface Booking {
   id: number;
@@ -143,7 +144,7 @@ const BookingManagement: React.FC<Props> = ({ bookings, filters }) => {
   };
 
   return (
-    <>
+    <HeaderLayout>
       <Head title="Booking Management" />
       
       <div className="min-h-screen bg-gray-50">
@@ -158,12 +159,6 @@ const BookingManagement: React.FC<Props> = ({ bookings, filters }) => {
               >
                 <ArrowLeftIcon className="w-5 h-5 text-gray-600" />
               </Button>
-              
-              <img 
-                src="/jaanNetworklogo.jpeg" 
-                alt="JAAN Network" 
-                className="h-8 w-auto object-contain"
-              />
               
               <h1 className="text-xl font-semibold text-gray-900">Booking Management</h1>
             </div>
@@ -332,7 +327,7 @@ const BookingManagement: React.FC<Props> = ({ bookings, filters }) => {
           </div>
         </div>
       </div>
-    </>
+    </HeaderLayout>
   );
 };
 

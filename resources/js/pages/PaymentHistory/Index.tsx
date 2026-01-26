@@ -10,6 +10,7 @@ import {
   BanknotesIcon,
   ClockIcon,
 } from '@heroicons/react/24/outline';
+import HeaderLayout from '@/layouts/header-layout';
 
 interface Customer {
   id: number;
@@ -189,7 +190,7 @@ const PaymentHistory: React.FC<Props> = ({ invoices, filters, stats }) => {
   };
 
   return (
-    <>
+    <HeaderLayout>
       <Head title="Payment History" />
       
       <div className="min-h-screen bg-gray-50">
@@ -204,12 +205,6 @@ const PaymentHistory: React.FC<Props> = ({ invoices, filters, stats }) => {
               >
                 <ArrowLeftIcon className="w-5 h-5 text-gray-600" />
               </Button>
-              
-              <img 
-                src="/jaanNetworklogo.jpeg" 
-                alt="JAAN Network" 
-                className="h-8 w-auto object-contain"
-              />
               
               <h1 className="text-xl font-semibold text-gray-900">Payment History</h1>
             </div>
@@ -448,7 +443,7 @@ const PaymentHistory: React.FC<Props> = ({ invoices, filters, stats }) => {
           </div>
         </div>
       </div>
-    </>
+    </HeaderLayout>
   );
 };
 

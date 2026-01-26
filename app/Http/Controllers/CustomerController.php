@@ -45,6 +45,11 @@ class CustomerController extends Controller
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:20|unique:customers,phone',
             'email' => 'nullable|email|max:255|unique:customers,email',
+            'nic' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:255',
+            'age' => 'nullable|integer|min:0|max:150',
+            'dob' => 'nullable|date',
+            'description' => 'nullable|string|max:500',
         ]);
 
         Customer::create($validated);
@@ -72,6 +77,11 @@ class CustomerController extends Controller
                 'max:255',
                 Rule::unique('customers', 'email')->ignore($customer->id),
             ],
+            'nic' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:255',
+            'age' => 'nullable|integer|min:0|max:150',
+            'dob' => 'nullable|date',
+            'description' => 'nullable|string|max:500',
         ]);
 
         $customer->update($validated);

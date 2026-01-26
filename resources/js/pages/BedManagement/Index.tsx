@@ -162,7 +162,7 @@ const BedManagement: React.FC<Props> = ({ beds: initialBeds }) => {
               </Button>
 
 
-              <h1 className="text-xl font-semibold text-gray-900">Bed Management</h1>
+              <h1 className="text-xl font-semibold text-gray-900">Seat Management</h1>
             </div>
 
             <div className="px-3 py-1.5 bg-teal-500 text-white rounded-lg text-sm font-medium">
@@ -178,7 +178,7 @@ const BedManagement: React.FC<Props> = ({ beds: initialBeds }) => {
                   <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <Input
                     type="text"
-                    placeholder="Search beds..."
+                    placeholder="Search seats..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10 w-80 border-gray-300 focus:border-teal-500 focus:ring-teal-500"

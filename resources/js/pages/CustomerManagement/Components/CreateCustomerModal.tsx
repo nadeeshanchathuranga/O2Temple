@@ -19,6 +19,11 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ open, onOpenC
     name: '',
     phone: '',
     email: '',
+    nic: '',
+    address: '',
+    age: '',
+    dob: '',
+    description: '',
   });
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,6 +56,8 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ open, onOpenC
     }
   }, [open, reset]);
 
+  // Optionally, add client-side validation for new fields if needed
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg p-0 gap-0 bg-white">
@@ -76,6 +83,7 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ open, onOpenC
           {/* Form */}
           <form onSubmit={handleSubmit} className="px-6 pb-6 bg-white">
             <div className="space-y-5 mt-4">
+              
               <div>
                 <Label htmlFor="create_name" className="text-sm font-medium text-gray-700 mb-2 block">
                   Name <span className="text-red-500">*</span>
@@ -133,6 +141,91 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ open, onOpenC
                 />
                 {errors.email && (
                   <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="create_nic" className="text-sm font-medium text-gray-700 mb-2 block">
+                  NIC
+                </Label>
+                <Input
+                  id="create_nic"
+                  type="text"
+                  placeholder="Enter NIC number"
+                  value={data.nic}
+                  onChange={e => setData('nic', e.target.value)}
+                  className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+                />
+                {errors.nic && (
+                  <p className="text-red-500 text-xs mt-1">{errors.nic}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="create_address" className="text-sm font-medium text-gray-700 mb-2 block">
+                  Address
+                </Label>
+                <Input
+                  id="create_address"
+                  type="text"
+                  placeholder="Enter address"
+                  value={data.address}
+                  onChange={e => setData('address', e.target.value)}
+                  className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+                />
+                {errors.address && (
+                  <p className="text-red-500 text-xs mt-1">{errors.address}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="create_age" className="text-sm font-medium text-gray-700 mb-2 block">
+                  Age
+                </Label>
+                <Input
+                  id="create_age"
+                  type="number"
+                  min="0"
+                  placeholder="Enter age"
+                  value={data.age}
+                  onChange={e => setData('age', e.target.value.replace(/\D/g, ''))}
+                  className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+                />
+                {errors.age && (
+                  <p className="text-red-500 text-xs mt-1">{errors.age}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="create_dob" className="text-sm font-medium text-gray-700 mb-2 block">
+                  Date of Birth
+                </Label>
+                <Input
+                  id="create_dob"
+                  type="date"
+                  placeholder="Select date of birth"
+                  value={data.dob}
+                  onChange={e => setData('dob', e.target.value)}
+                  className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+                />
+                {errors.dob && (
+                  <p className="text-red-500 text-xs mt-1">{errors.dob}</p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="create_description" className="text-sm font-medium text-gray-700 mb-2 block">
+                  Description
+                </Label>
+                <Input
+                  id="create_description"
+                  type="text"
+                  placeholder="Enter description"
+                  value={data.description}
+                  onChange={e => setData('description', e.target.value)}
+                  className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+                />
+                {errors.description && (
+                  <p className="text-red-500 text-xs mt-1">{errors.description}</p>
                 )}
               </div>
 

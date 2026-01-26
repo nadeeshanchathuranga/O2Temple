@@ -11,6 +11,11 @@ class Customer extends Model
         'name',
         'phone',
         'email',
+        'nic',
+        'address',
+        'age',
+        'dob',
+        'description',
     ];
 
     /**
