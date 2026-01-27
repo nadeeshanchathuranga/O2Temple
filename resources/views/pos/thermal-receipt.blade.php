@@ -28,6 +28,11 @@
             padding-bottom: 5px;
         }
         
+        .logo {
+            width: 150px;
+            height: 150px;
+        }
+        
         .business-name {
             font-size: 16px;
             font-weight: bold;
@@ -134,6 +139,7 @@
 </head>
 <body>
     <div class="receipt-header">
+        <img src="{{ asset('images/logo1.png') }}" alt="O2Temple Logo" class="logo">
         <div class="business-name">O2TEMPLE</div>
         <div class="business-info">
             133/11/C Gothami place,<br>
