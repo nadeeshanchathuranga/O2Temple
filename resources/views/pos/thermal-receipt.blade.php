@@ -134,12 +134,11 @@
 </head>
 <body>
     <div class="receipt-header">
-        <div class="business-name">O2 TEMPLE</div>
+        <div class="business-name">O2TEMPLE</div>
         <div class="business-info">
-            Wellness & Recovery Center<br>
-            123 Wellness Street<br>
-            Colombo, Sri Lanka<br>
-            Tel: +94 77 123 4567
+            133/11/C Gothami place,<br>
+            Rajagiriya, Sri Lanka<br>
+            Tel: +94 71 155 0750
         </div>
     </div>
 
