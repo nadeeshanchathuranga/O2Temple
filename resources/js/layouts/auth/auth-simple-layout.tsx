@@ -21,6 +21,14 @@ export default function AuthSimpleLayout({
                             href="/"
                             className="flex flex-col items-center gap-2 font-medium"
                         >
+                            {/* Logo */}
+                            <div className="flex justify-center mb-6">
+                                <img 
+                                    src="/images/logo.jpeg" 
+                                    alt="Company Logo" 
+                                    className="h-12 w-auto"
+                                />
+                            </div>
                             <div className="mb-1 flex items-center justify-center">
                                 <span className="text-3xl font-bold spa-logo">
                                     O<sub className="text-lg">2</sub> Temple

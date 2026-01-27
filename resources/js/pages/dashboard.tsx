@@ -95,7 +95,7 @@ export default function Dashboard({ user }: DashboardProps) {
         if (userRole === 'cashier') {
             // Cashiers only see POS Billing and Booking Management
             return dashboardModules.filter(module => 
-                module.id === 'pos-billing' || module.id === 'booking-management'
+                module.id === 'pos-billing' || module.id === 'booking-management'|| module.id === 'customer-management'
             );
         }
         // Admins and other roles see all modules
