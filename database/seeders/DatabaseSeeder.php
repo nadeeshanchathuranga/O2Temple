@@ -18,8 +18,8 @@ class DatabaseSeeder extends Seeder
             AdminUserSeeder::class,
            // CustomerSeeder::class,
            // BedSeeder::class,
-            PackageSeeder::class,
-            ProductSeeder::class,
+            //PackageSeeder::class,
+            //ProductSeeder::class,
         ]);
     }
 }
