@@ -748,7 +748,7 @@ const POSBilling: React.FC<Props> = ({
               <div className="bg-white rounded-lg shadow-sm p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="font-semibold text-gray-900">Select Bed</h2>
-                  <div className="flex items-center gap-4 text-xs">
+                  <div className="flex items-center gap-4 text-xs text-black">
                     <span className="flex items-center gap-1">
                       <span className="w-3 h-3 rounded-full bg-green-500"></span>
                       Available
