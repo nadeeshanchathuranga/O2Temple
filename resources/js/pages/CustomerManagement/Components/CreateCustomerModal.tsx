@@ -67,14 +67,7 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ open, onOpenC
               </svg>
             </div>
             <h2 className="text-base sm:text-lg font-semibold text-gray-900">Create Customer</h2>
-            <button
-              onClick={() => onOpenChange(false)}
-              className="absolute top-3 right-3 sm:top-4 sm:right-4 p-1 sm:p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
-            >
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            {/* Only one close button should be present, removed duplicate */}
           </div>
 
           {/* Form */}
