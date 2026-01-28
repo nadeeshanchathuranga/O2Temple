@@ -175,7 +175,25 @@ const POSBilling: React.FC<Props> = ({
   const [isLoading, setIsLoading] = useState(false);
   
   // Customer form
-  const [customerForm, setCustomerForm] = useState({ name: '', phone: '', email: '' });
+  const [customerForm, setCustomerForm] = useState<{
+    name: string;
+    phone: string;
+    email: string;
+    nic?: string;
+    address?: string;
+    age?: string;
+    dob?: string;
+    description?: string;
+  }>({
+    name: '',
+    phone: '',
+    email: '',
+    nic: '',
+    address: '',
+    age: '',
+    dob: '',
+    description: '',
+  });
   
   // Booking form - use Sri Lanka time
   const [bookingForm, setBookingForm] = useState({
@@ -1529,90 +1547,189 @@ const POSBilling: React.FC<Props> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Add Customer Modal */}
-      <Dialog open={showCustomerModal} onOpenChange={setShowCustomerModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Customer</DialogTitle>
-            <DialogDescription>Create a new customer profile with their contact information.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
+      {/* Add Customer Modal - Responsive */}
+<Dialog open={showCustomerModal} onOpenChange={setShowCustomerModal}>
+  <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-xl p-0 bg-white rounded-lg mx-2 sm:mx-0">
+    <div className="relative bg-white rounded-lg">
+      {/* Header */}
+      <div className="flex items-center gap-3 p-4 sm:p-6 pb-4 border-b border-gray-100">
+        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
+          <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900">Add New Customer</h2>
+          <p className="text-xs sm:text-sm text-gray-600 mt-0.5">Create a new customer profile with their contact information.</p>
+        </div>
+        <button
+          onClick={() => setShowCustomerModal(false)}
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 p-1 sm:p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
+        >
+          <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Form */}
+      <div className="px-4 sm:px-6 pb-4 sm:pb-6 bg-white overflow-y-auto max-h-[70vh] sm:max-h-[80vh]">
+        <div className="space-y-4 sm:space-y-5">
+          <div>
+            <Label htmlFor="modal_name" className="text-sm font-medium text-gray-700 mb-1 sm:mb-2 block">
+              Name <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="modal_name"
+              type="text"
+              placeholder="Enter customer name"
+              value={customerForm.name}
+              onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
+              required
+              className="w-full h-10 sm:h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="modal_phone" className="text-sm font-medium text-gray-700 mb-1 sm:mb-2 block">
+              Phone <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="modal_phone"
+              type="text"
+              placeholder="Enter 10-digit phone number"
+              value={customerForm.phone}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                if (val.length <= 10) {
+                  setCustomerForm({ ...customerForm, phone: val });
+                }
+              }}
+              required
+              maxLength={10}
+              className="w-full h-10 sm:h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+            />
+            {customerForm.phone && customerForm.phone.length !== 10 && (
+              <p className="text-red-500 text-xs mt-1">Phone number must be exactly 10 digits</p>
+            )}
+            {customerForm.phone && customerForm.phone.length > 0 && (
+              <p className="text-gray-500 text-xs mt-1">{customerForm.phone.length}/10 digits</p>
+            )}
+          </div>
+
+
+          <div>
+            <Label htmlFor="modal_email" className="text-sm font-medium text-gray-700 mb-1 sm:mb-2 block">
+              Email (Optional)
+            </Label>
+            <Input
+              id="modal_email"
+              type="email"
+              placeholder="Enter email address"
+              value={customerForm.email}
+              onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
+              className="w-full h-10 sm:h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
             <div>
-              <Label>Name *</Label>
+              <Label htmlFor="modal_nic" className="text-sm font-medium text-gray-700 mb-1 sm:mb-2 block">
+                NIC
+              </Label>
               <Input
-                value={customerForm.name}
-                onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
-                placeholder="Enter customer name"
-              />
-            </div>
-            <div>
-              <Label>Phone *</Label>
-              <Input
-                value={customerForm.phone}
-                onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
-                placeholder="Enter phone number"
-              />
-            </div>
-            <div>
-              <Label>Email (Optional)</Label>
-              <Input
-                type="email"
-                value={customerForm.email}
-                onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
-                placeholder="Enter email address"
-              />
-            </div>
-            <div>
-              <Label>NIC</Label>
-              <Input
+                id="modal_nic"
+                type="text"
+                placeholder="Enter NIC number"
                 value={customerForm.nic || ''}
                 onChange={(e) => setCustomerForm({ ...customerForm, nic: e.target.value })}
-                placeholder="Enter NIC number"
+                className="w-full h-10 sm:h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
               />
             </div>
+
             <div>
-              <Label>Address</Label>
+              <Label htmlFor="modal_age" className="text-sm font-medium text-gray-700 mb-1 sm:mb-2 block">
+                Age
+              </Label>
               <Input
-                value={customerForm.address || ''}
-                onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
-                placeholder="Enter address"
-              />
-            </div>
-            <div>
-              <Label>Age</Label>
-              <Input
+                id="modal_age"
                 type="number"
                 min="0"
+                placeholder="Enter age"
                 value={customerForm.age || ''}
                 onChange={(e) => setCustomerForm({ ...customerForm, age: e.target.value.replace(/\D/g, '') })}
-                placeholder="Enter age"
-              />
-            </div>
-            <div>
-              <Label>Date of Birth</Label>
-              <Input
-                type="date"
-                value={customerForm.dob || ''}
-                onChange={(e) => setCustomerForm({ ...customerForm, dob: e.target.value })}
-                placeholder="Select date of birth"
-              />
-            </div>
-            <div>
-              <Label>Description</Label>
-              <Input
-                value={customerForm.description || ''}
-                onChange={(e) => setCustomerForm({ ...customerForm, description: e.target.value })}
-                placeholder="Enter description"
+                className="w-full h-10 sm:h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" className="border-gray-300 text-gray-700 hover:bg-gray-50" onClick={() => setShowCustomerModal(false)}>Cancel</Button>
-            <Button onClick={handleCreateCustomer} className="bg-teal-600 hover:bg-teal-700 text-white">Save Customer</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
+          <div>
+            <Label htmlFor="modal_address" className="text-sm font-medium text-gray-700 mb-1 sm:mb-2 block">
+              Address
+            </Label>
+            <Input
+              id="modal_address"
+              type="text"
+              placeholder="Enter address"
+              value={customerForm.address || ''}
+              onChange={(e) => setCustomerForm({ ...customerForm, address: e.target.value })}
+              className="w-full h-10 sm:h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+            <div>
+              <Label htmlFor="modal_dob" className="text-sm font-medium text-gray-700 mb-1 sm:mb-2 block">
+                Date of Birth
+              </Label>
+              <Input
+                id="modal_dob"
+                type="date"
+                placeholder="Select date of birth"
+                value={customerForm.dob || ''}
+                onChange={(e) => setCustomerForm({ ...customerForm, dob: e.target.value })}
+                className="w-full h-10 sm:h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="modal_description" className="text-sm font-medium text-gray-700 mb-1 sm:mb-2 block">
+                Description
+              </Label>
+              <Input
+                id="modal_description"
+                type="text"
+                placeholder="Enter description"
+                value={customerForm.description || ''}
+                onChange={(e) => setCustomerForm({ ...customerForm, description: e.target.value })}
+                className="w-full h-10 sm:h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setShowCustomerModal(false)}
+            className="w-full sm:w-auto px-4 sm:px-6 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-50 font-medium order-2 sm:order-1"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreateCustomer}
+            disabled={isLoading}
+            className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
+          >
+            {isLoading ? 'Saving...' : 'Save Customer'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  </DialogContent>
+</Dialog>
       {/* Payment Modal */}
       <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
         <DialogContent className="max-w-md">
