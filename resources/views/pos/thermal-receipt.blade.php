@@ -11,68 +11,70 @@
         }
         
         body {
-            font-family: 'Courier New', monospace;
+            font-family: 'Arial', sans-serif;
             font-size: 12px;
-            line-height: 1.2;
+            line-height: 1.1;
             margin: 0;
-            padding: 5mm;
-            width: 70mm;
+            padding: 3mm 2mm;
+            width: 76mm;
             color: #000;
             background: #fff;
         }
         
         .receipt-header {
             text-align: center;
-            margin-bottom: 10px;
+            margin-bottom: 6px;
             border-bottom: 1px dashed #000;
-            padding-bottom: 5px;
+            padding-bottom: 3px;
         }
         
         .logo {
-            width: 150px;
-            height: 150px;
+            width: 80px;
+            height: 80px;
         }
         
         .business-name {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
         }
         
         .business-info {
             font-size: 10px;
-            line-height: 1.1;
+            line-height: 1.0;
+            margin-bottom: 1px;
         }
         
         .receipt-title {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
-            margin: 8px 0;
+            margin: 4px 0 3px 0;
             text-align: center;
         }
         
         .receipt-info {
-            margin-bottom: 8px;
+            margin-bottom: 4px;
             font-size: 11px;
         }
         
         .info-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
+            word-break: break-word;
         }
         
         .items-header {
             border-top: 1px dashed #000;
             border-bottom: 1px dashed #000;
-            padding: 3px 0;
-            margin: 8px 0;
+            padding: 2px 0;
+            margin: 3px 0;
             font-weight: bold;
             font-size: 11px;
         }
         
         .item {
-            margin-bottom: 3px;
+            margin-bottom: 2px;
             font-size: 11px;
         }
         
@@ -95,30 +97,30 @@
         .total-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 2px;
+            margin-bottom: 1px;
             font-size: 11px;
         }
         
         .grand-total {
             border-top: 1px solid #000;
             border-bottom: 1px solid #000;
-            padding: 3px 0;
-            margin: 3px 0;
+            padding: 2px 0;
+            margin: 2px 0;
             font-weight: bold;
             font-size: 12px;
         }
         
         .payment-info {
-            margin-top: 8px;
+            margin-top: 4px;
             border-top: 1px dashed #000;
-            padding-top: 5px;
+            padding-top: 3px;
         }
         
         .receipt-footer {
             text-align: center;
-            margin-top: 10px;
+            margin-top: 5px;
             border-top: 1px dashed #000;
-            padding-top: 5px;
+            padding-top: 3px;
             font-size: 10px;
         }
         
