@@ -22,7 +22,7 @@ class AdminUserSeeder extends Seeder
                 ['email' => 'admin@o2temple.com'],
                 [
                     'name' => 'Admin User',
-                    'password' => Hash::make('password'),
+                    'password' => Hash::make('O2temple777'),
                     'role_id' => $adminRole->id,
                     'email_verified_at' => now(),
                 ]
@@ -36,7 +36,7 @@ class AdminUserSeeder extends Seeder
                 ['email' => 'cashier@o2temple.com'],
                 [
                     'name' => 'Cashier User',
-                    'password' => Hash::make('password'),
+                    'password' => Hash::make('O2cashier'),
                     'role_id' => $cashierRole->id,
                     'email_verified_at' => now(),
                 ]
