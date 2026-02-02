@@ -825,14 +825,26 @@ class POSController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'phone' => 'required|string|max:20',
+            'phone_2' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
+            'nic' => 'nullable|string|max:20',
+            'address' => 'nullable|string|max:255',
+            'age' => 'nullable|integer|min:0|max:150',
+            'dob' => 'nullable|date',
+            'description' => 'nullable|string|max:500',
         ]);
 
         $customer = Customer::firstOrCreate(
             ['phone' => $validated['phone']],
             [
                 'name' => $validated['name'],
+                'phone_2' => $validated['phone_2'] ?? null,
                 'email' => $validated['email'] ?? null,
+                'nic' => $validated['nic'] ?? null,
+                'address' => $validated['address'] ?? null,
+                'age' => $validated['age'] ?? null,
+                'dob' => $validated['dob'] ?? null,
+                'description' => $validated['description'] ?? null,
             ]
         );
 

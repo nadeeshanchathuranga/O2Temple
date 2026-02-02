@@ -180,6 +180,7 @@ const POSBilling: React.FC<Props> = ({
   const [customerForm, setCustomerForm] = useState<{
     name: string;
     phone: string;
+    phone_2?: string;
     email: string;
     nic?: string;
     address?: string;
@@ -189,6 +190,7 @@ const POSBilling: React.FC<Props> = ({
   }>({
     name: '',
     phone: '',
+    phone_2: '',
     email: '',
     nic: '',
     address: '',
@@ -458,7 +460,7 @@ const POSBilling: React.FC<Props> = ({
         setCustomers([...customers, newCustomer]);
         setSelectedCustomer(newCustomer);
         setShowCustomerModal(false);
-        setCustomerForm({ name: '', phone: '', email: '' });
+        setCustomerForm({ name: '', phone: '', phone_2: '', email: '', nic: '', address: '', age: '', dob: '', description: '' });
       }
     } catch (error: any) {
       alert(error.response?.data?.message || 'Error creating customer');
@@ -991,7 +993,7 @@ const POSBilling: React.FC<Props> = ({
                       size="sm"
                       className="bg-teal-600 hover:bg-teal-700 text-white"
                       onClick={() => {
-                        setCustomerForm({ name: '', phone: '', email: '' });
+                        setCustomerForm({ name: '', phone: '', phone_2: '', email: '', nic: '', address: '', age: '', dob: '', description: '' });
                         setShowCustomerModal(true);
                       }}
                     >
@@ -1579,28 +1581,21 @@ const POSBilling: React.FC<Props> = ({
       {/* Add Customer Modal - Responsive */}
 <Dialog open={showCustomerModal} onOpenChange={setShowCustomerModal}>
   <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-xl p-0 bg-white rounded-lg mx-2 sm:mx-0">
-    <div className="relative bg-white rounded-lg">
-      {/* Header */}
-      <div className="flex items-center gap-3 p-4 sm:p-6 pb-4 border-b border-gray-100">
+    <DialogHeader className="flex items-center gap-3 p-4 sm:p-6 pb-4 border-b border-gray-100">
+      <div className="flex items-center gap-3 w-full">
         <div className="w-8 h-8 sm:w-10 sm:h-10 bg-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
           <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
           </svg>
         </div>
         <div className="flex-1">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-900">Add New Customer</h2>
-          <p className="text-xs sm:text-sm text-gray-600 mt-0.5">Create a new customer profile with their contact information.</p>
+          <DialogTitle className="text-base sm:text-lg font-semibold text-gray-900">Add New Customer</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm text-gray-600 mt-0.5">
+            Create a new customer profile with their contact information.
+          </DialogDescription>
         </div>
-        {/* Only one close button should be present */}
-        <button
-          onClick={() => setShowCustomerModal(false)}
-          className="absolute top-3 right-3 sm:top-4 sm:right-4 p-1 sm:p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
-        >
-          {/* <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg> */}
-        </button>
       </div>
+    </DialogHeader>
 
       {/* Form */}
       <div className="px-4 sm:px-6 pb-4 sm:pb-6 bg-white overflow-y-auto max-h-[70vh] sm:max-h-[80vh]">
@@ -1644,6 +1639,32 @@ const POSBilling: React.FC<Props> = ({
             )}
             {customerForm.phone && customerForm.phone.length > 0 && (
               <p className="text-gray-500 text-xs mt-1">{customerForm.phone.length}/10 digits</p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="modal_phone_2" className="text-sm font-medium text-gray-700 mb-1 sm:mb-2 block">
+              Phone 2 (Optional)
+            </Label>
+            <Input
+              id="modal_phone_2"
+              type="text"
+              placeholder="Enter 10-digit second phone number"
+              value={customerForm.phone_2 || ''}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                if (val.length <= 10) {
+                  setCustomerForm({ ...customerForm, phone_2: val });
+                }
+              }}
+              maxLength={10}
+              className="w-full h-10 sm:h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+            />
+            {customerForm.phone_2 && customerForm.phone_2.length > 0 && customerForm.phone_2.length !== 10 && (
+              <p className="text-red-500 text-xs mt-1">Phone number must be exactly 10 digits</p>
+            )}
+            {customerForm.phone_2 && customerForm.phone_2.length > 0 && (
+              <p className="text-gray-500 text-xs mt-1">{customerForm.phone_2.length}/10 digits</p>
             )}
           </div>
 
@@ -1757,7 +1778,6 @@ const POSBilling: React.FC<Props> = ({
           </Button>
         </div>
       </div>
-    </div>
   </DialogContent>
 </Dialog>
       {/* Payment Modal */}
@@ -2024,7 +2044,7 @@ const POSBilling: React.FC<Props> = ({
                   variant="outline"
                   onClick={() => {
                     setShowBookingModal(false);
-                    setCustomerForm({ name: '', phone: '', email: '' });
+                    setCustomerForm({ name: '', phone: '', phone_2: '', email: '', nic: '', address: '', age: '', dob: '', description: '' });
                     setShowCustomerModal(true);
                   }}
                   className="shrink-0"
