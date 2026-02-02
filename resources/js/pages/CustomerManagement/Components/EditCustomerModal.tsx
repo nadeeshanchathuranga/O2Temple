@@ -7,6 +7,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { PencilIcon } from '@heroicons/react/24/outline';
 
@@ -14,7 +17,13 @@ interface Customer {
   id: number;
   name: string;
   phone: string;
+  phone_2?: string;
   email?: string;
+  nic?: string;
+  address?: string;
+  age?: number;
+  dob?: string;
+  description?: string;
   created_at: string;
   updated_at: string;
 }
@@ -29,7 +38,13 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
   const { data, setData, put, processing, errors, reset } = useForm({
     name: customer?.name || '',
     phone: customer?.phone || '',
+    phone_2: customer?.phone_2 || '',
     email: customer?.email || '',
+    nic: customer?.nic || '',
+    address: customer?.address || '',
+    age: customer?.age?.toString() || '',
+    dob: customer?.dob || '',
+    description: customer?.description || '',
   });
 
   React.useEffect(() => {
@@ -37,7 +52,13 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
       setData({
         name: customer.name,
         phone: customer.phone,
+        phone_2: customer.phone_2 || '',
         email: customer.email || '',
+        nic: customer.nic || '',
+        address: customer.address || '',
+        age: customer.age?.toString() || '',
+        dob: customer.dob || '',
+        description: customer.description || '',
       });
     } else {
       reset();
@@ -79,26 +100,23 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg p-0 gap-0 bg-white">
-        <div className="relative bg-white rounded-lg">
-          {/* Header */}
-          <div className="flex items-center gap-3 p-6 pb-4 border-b border-gray-100">
+      <DialogContent className="max-w-lg p-0 gap-0 bg-white max-h-[90vh]">
+        <DialogHeader className="flex items-center gap-3 p-6 pb-4 border-b border-gray-100">
+          <div className="flex items-center gap-3 w-full">
             <div className="w-10 h-10 bg-teal-500 rounded-xl flex items-center justify-center">
               <PencilIcon className="w-5 h-5 text-white" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900">Edit Customer</h2>
-            <button
-              onClick={handleClose}
-              className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex-1">
+              <DialogTitle className="text-lg font-semibold text-gray-900">Edit Customer</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm text-gray-600 mt-0.5">
+                Update customer information and contact details.
+              </DialogDescription>
+            </div>
           </div>
+        </DialogHeader>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="px-6 pb-6 bg-white">
+          <form onSubmit={handleSubmit} className="px-6 pb-6 bg-white overflow-y-auto max-h-[70vh]">
             <div className="space-y-5 mt-4">
               <div>
                 <Label htmlFor="edit_name" className="text-sm font-medium text-gray-700 mb-2 block">
@@ -144,6 +162,35 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
               </div>
 
               <div>
+                <Label htmlFor="edit_phone_2" className="text-sm font-medium text-gray-700 mb-2 block">
+                  Phone 2 (Optional)
+                </Label>
+                <Input
+                  id="edit_phone_2"
+                  type="text"
+                  placeholder="Enter second phone number"
+                  value={data.phone_2}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '');
+                    if (value.length <= 10) {
+                      setData('phone_2', value);
+                    }
+                  }}
+                  maxLength={10}
+                  className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+                />
+                {errors.phone_2 && (
+                  <p className="text-red-500 text-xs mt-1">{errors.phone_2}</p>
+                )}
+                {data.phone_2 && data.phone_2.length > 0 && data.phone_2.length !== 10 && (
+                  <p className="text-red-500 text-xs mt-1">Phone number must be exactly 10 digits</p>
+                )}
+                {data.phone_2 && data.phone_2.length > 0 && (
+                  <p className="text-gray-500 text-xs mt-1">{data.phone_2.length}/10 digits</p>
+                )}
+              </div>
+
+              <div>
                 <Label htmlFor="edit_email" className="text-sm font-medium text-gray-700 mb-2 block">
                   Email
                 </Label>
@@ -158,6 +205,96 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
                 {errors.email && (
                   <p className="text-red-500 text-xs mt-1">{errors.email}</p>
                 )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit_nic" className="text-sm font-medium text-gray-700 mb-2 block">
+                    NIC
+                  </Label>
+                  <Input
+                    id="edit_nic"
+                    type="text"
+                    placeholder="Enter NIC number"
+                    value={data.nic}
+                    onChange={(e) => setData('nic', e.target.value)}
+                    className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+                  />
+                  {errors.nic && (
+                    <p className="text-red-500 text-xs mt-1">{errors.nic}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="edit_age" className="text-sm font-medium text-gray-700 mb-2 block">
+                    Age
+                  </Label>
+                  <Input
+                    id="edit_age"
+                    type="number"
+                    min="0"
+                    placeholder="Enter age"
+                    value={data.age}
+                    onChange={(e) => setData('age', e.target.value.replace(/\D/g, ''))}
+                    className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+                  />
+                  {errors.age && (
+                    <p className="text-red-500 text-xs mt-1">{errors.age}</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="edit_address" className="text-sm font-medium text-gray-700 mb-2 block">
+                  Address
+                </Label>
+                <Input
+                  id="edit_address"
+                  type="text"
+                  placeholder="Enter address"
+                  value={data.address}
+                  onChange={(e) => setData('address', e.target.value)}
+                  className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+                />
+                {errors.address && (
+                  <p className="text-red-500 text-xs mt-1">{errors.address}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit_dob" className="text-sm font-medium text-gray-700 mb-2 block">
+                    Date of Birth
+                  </Label>
+                  <Input
+                    id="edit_dob"
+                    type="date"
+                    placeholder="Select date of birth"
+                    value={data.dob}
+                    onChange={(e) => setData('dob', e.target.value)}
+                    className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+                  />
+                  {errors.dob && (
+                    <p className="text-red-500 text-xs mt-1">{errors.dob}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="edit_description" className="text-sm font-medium text-gray-700 mb-2 block">
+                    Description
+                  </Label>
+                  <Input
+                    id="edit_description"
+                    type="text"
+                    placeholder="Enter description"
+                    value={data.description}
+                    onChange={(e) => setData('description', e.target.value)}
+                    className="w-full h-11 px-3 border border-gray-300 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm bg-white placeholder:text-gray-500 text-gray-900"
+                  />
+                  {errors.description && (
+                    <p className="text-red-500 text-xs mt-1">{errors.description}</p>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
@@ -191,7 +328,6 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ open, onOpenChang
               </Button>
             </div>
           </form>
-        </div>
       </DialogContent>
     </Dialog>
   );
