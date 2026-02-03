@@ -10,6 +10,7 @@ use App\Http\Controllers\BookingController;
 use App\Http\Controllers\POSController;
 use App\Http\Controllers\PaymentHistoryController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\UserManagementController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -109,6 +110,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('customers', CustomerController::class)->except(['create', 'edit']);
     Route::resource('beds', BedManagementController::class);
     Route::resource('packages', PackageController::class);
+});
+
+// User Management Routes (Admin only)
+Route::middleware(['auth', 'verified', 'role:Admin'])->group(function () {
+    Route::resource('users', UserManagementController::class)->except(['create', 'edit', 'show']);
 });
 
 require __DIR__.'/settings.php';

@@ -7,7 +7,8 @@ import {
     CreditCard,
     BarChart3,
     Activity,
-    Calendar
+    Calendar,
+    UserCog
 } from 'lucide-react';
 
 import HeaderLayout from '@/layouts/header-layout';
@@ -74,6 +75,15 @@ const dashboardModules = [
         color: 'bg-gradient-to-br from-purple-400 to-purple-600',
         textColor: 'text-white',
         href: '/payment-history'
+    },
+    {
+        id: 'user-management',
+        title: 'USER MANAGEMENT',
+        description: 'Manage system users, roles and access permissions',
+        icon: UserCog,
+        color: 'bg-gradient-to-br from-orange-400 to-orange-600',
+        textColor: 'text-white',
+        href: '/users'
     },
     {
         id: 'reports',

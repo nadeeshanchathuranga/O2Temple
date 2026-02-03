@@ -15,18 +15,25 @@ import {
 } from '@heroicons/react/24/outline';
 import HeaderLayout from '@/layouts/header-layout';
 
-interface DailyRevenue {
+interface SalesSummaryItem {
+  id: number;
+  invoice_number: string;
+  customer_name: string;
+  customer_phone: string;
+  package_name: string;
+  invoice_type: string;
+  payment_method: string;
+  amount: number;
   date: string;
-  invoice_count: number;
-  revenue: number;
+  time: string;
 }
 
-interface MonthlyRevenue {
-  month: number;
-  year: number;
-  month_name: string;
-  invoice_count: number;
-  revenue: number;
+interface SalesSummary {
+  data: SalesSummaryItem[];
+  current_page: number;
+  last_page: number;
+  total: number;
+  per_page: number;
 }
 
 interface RevenueByType {
@@ -77,8 +84,7 @@ interface Stats {
 
 interface Props {
   stats: Stats;
-  dailyRevenue: DailyRevenue[];
-  monthlyRevenueTable: MonthlyRevenue[];
+  salesSummary: SalesSummary;
   revenueByType: RevenueByType[];
   topPackages: Package[];
   topCustomers: Customer[];
@@ -87,13 +93,13 @@ interface Props {
   filters: {
     year: number;
     month: number;
+    day: number | null;
   };
 }
 
 const Reports: React.FC<Props> = ({
   stats,
-  dailyRevenue,
-  monthlyRevenueTable,
+  salesSummary,
   revenueByType,
   topPackages,
   topCustomers,
@@ -103,15 +109,44 @@ const Reports: React.FC<Props> = ({
 }) => {
   const [selectedYear, setSelectedYear] = useState(filters.year);
   const [selectedMonth, setSelectedMonth] = useState(filters.month);
+  const [selectedDay, setSelectedDay] = useState(filters.day || null);
+
+  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
+  const months = [
+    { value: 1, label: 'January' },
+    { value: 2, label: 'February' },
+    { value: 3, label: 'March' },
+    { value: 4, label: 'April' },
+    { value: 5, label: 'May' },
+    { value: 6, label: 'June' },
+    { value: 7, label: 'July' },
+    { value: 8, label: 'August' },
+    { value: 9, label: 'September' },
+    { value: 10, label: 'October' },
+    { value: 11, label: 'November' },
+    { value: 12, label: 'December' },
+  ];
 
   const handleFilter = () => {
-    router.get('/reports', {
-      year: selectedYear,
-      month: selectedMonth,
-    }, {
+    const params = { year: selectedYear, month: selectedMonth } as any;
+    if (selectedDay) {
+      params.day = selectedDay;
+    }
+    router.get('/reports', params, {
       preserveState: true,
       preserveScroll: true,
     });
+  };
+
+  const handleExport = (format: 'pdf' | 'excel') => {
+    const params = new URLSearchParams();
+    params.set('year', selectedYear.toString());
+    params.set('month', selectedMonth.toString());
+    if (selectedDay) {
+      params.set('day', selectedDay.toString());
+    }
+    params.set('export', format);
+    window.location.href = `/reports?${params.toString()}`;
   };
 
   const formatCurrency = (amount: number) => {
@@ -161,23 +196,6 @@ const Reports: React.FC<Props> = ({
     };
     return classes[status] || 'bg-gray-100 text-gray-700';
   };
-
-  const months = [
-    { value: 1, label: 'January' },
-    { value: 2, label: 'February' },
-    { value: 3, label: 'March' },
-    { value: 4, label: 'April' },
-    { value: 5, label: 'May' },
-    { value: 6, label: 'June' },
-    { value: 7, label: 'July' },
-    { value: 8, label: 'August' },
-    { value: 9, label: 'September' },
-    { value: 10, label: 'October' },
-    { value: 11, label: 'November' },
-    { value: 12, label: 'December' },
-  ];
-
-  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
   const revenueChange = stats.today_revenue - stats.yesterday_revenue;
   const revenueChangePercent = stats.yesterday_revenue > 0 
@@ -238,12 +256,43 @@ const Reports: React.FC<Props> = ({
                 </select>
               </div>
 
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">Day:</label>
+                <select
+                  value={selectedDay || ''}
+                  onChange={(e) => setSelectedDay(e.target.value ? Number(e.target.value) : null)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 focus:border-pink-500 focus:ring-pink-500 bg-white text-gray-900"
+                >
+                  <option value="">All Days</option>
+                  {Array.from({ length: new Date(selectedYear, selectedMonth, 0).getDate() }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>{i + 1}</option>
+                  ))}
+                </select>
+              </div>
+
               <Button 
                 onClick={handleFilter}
                 className="bg-pink-500 hover:bg-pink-600 text-white"
               >
                 Apply Filter
               </Button>
+
+              <div className="flex items-center gap-2 ml-auto">
+                <Button 
+                  variant="outline"
+                  onClick={() => handleExport('excel')}
+                  className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                >
+                  Export Excel
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => handleExport('pdf')}
+                  className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                >
+                  Export PDF
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -366,90 +415,142 @@ const Reports: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Tables Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Monthly Revenue Table */}
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Monthly Revenue ({selectedYear})</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
+          {/* Sales Summary Table */}
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Sales Summary ({selectedDay ? `${months[selectedMonth - 1]?.label} ${selectedDay}, ${selectedYear}` : `${months[selectedMonth - 1]?.label} ${selectedYear}`})
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {selectedDay ? 'Daily breakdown of completed sales' : 'Detailed breakdown of all completed sales'}
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Invoice #</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Customer</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Package/Service</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Payment</th>
+                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date & Time</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {salesSummary.data.length === 0 ? (
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Month</th>
-                      <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Invoices</th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Revenue</th>
+                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                        No sales data available for this period
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {monthlyRevenueTable.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
-                          No data available for this year
+                  ) : (
+                    salesSummary.data.map((sale) => (
+                      <tr key={sale.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <span className="text-sm font-medium text-gray-900">{sale.invoice_number}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm">
+                            <div className="font-medium text-gray-900">{sale.customer_name}</div>
+                            <div className="text-gray-500">{sale.customer_phone}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm text-gray-900">{sale.package_name}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <Badge
+                            variant={sale.invoice_type === 'Booking' ? 'default' : 'secondary'}
+                            className={`text-xs ${
+                              sale.invoice_type === 'Booking' ? 'bg-blue-100 text-blue-800' :
+                              sale.invoice_type === 'Walk In' ? 'bg-green-100 text-green-800' :
+                              sale.invoice_type === 'Pos Sale' ? 'bg-purple-100 text-purple-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {sale.invoice_type}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4">
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${
+                              sale.payment_method.toLowerCase().includes('cash') ? 'bg-green-50 text-green-700 border-green-200' :
+                              sale.payment_method.toLowerCase().includes('card') ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                              'bg-gray-50 text-gray-700 border-gray-200'
+                            }`}
+                          >
+                            {sale.payment_method}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span className="text-sm font-semibold text-green-600">{formatCurrency(sale.amount)}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            <div>{formatDate(sale.date)}</div>
+                            <div className="text-gray-500">{sale.time}</div>
+                          </div>
                         </td>
                       </tr>
-                    ) : (
-                      monthlyRevenueTable.map((item) => (
-                        <tr key={item.month} className="hover:bg-gray-50">
-                          <td className="px-6 py-3 font-medium text-gray-900">{item.month_name}</td>
-                          <td className="px-6 py-3 text-center text-gray-700">{item.invoice_count}</td>
-                          <td className="px-6 py-3 text-right font-semibold text-green-600">{formatCurrency(item.revenue)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                  {monthlyRevenueTable.length > 0 && (
-                    <tfoot className="bg-gray-50">
-                      <tr>
-                        <td className="px-6 py-3 font-bold text-gray-900">Total</td>
-                        <td className="px-6 py-3 text-center font-bold text-gray-900">
-                          {monthlyRevenueTable.reduce((sum, item) => sum + item.invoice_count, 0)}
-                        </td>
-                        <td className="px-6 py-3 text-right font-bold text-green-600">
-                          {formatCurrency(monthlyRevenueTable.reduce((sum, item) => sum + Number(item.revenue), 0))}
-                        </td>
-                      </tr>
-                    </tfoot>
+                    ))
                   )}
-                </table>
-              </div>
-            </div>
-
-            {/* Daily Revenue Table */}
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Daily Revenue (Last 30 Days)</h3>
-              </div>
-              <div className="overflow-x-auto max-h-96">
-                <table className="w-full">
-                  <thead className="bg-gray-50 sticky top-0">
+                </tbody>
+                {salesSummary.data.length > 0 && (
+                  <tfoot className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
-                      <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Invoices</th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Revenue</th>
+                      <td colSpan={5} className="px-6 py-3 font-bold text-gray-900">Total ({salesSummary.total} sales)</td>
+                      <td className="px-6 py-3 text-right font-bold text-green-600">
+                        {formatCurrency(salesSummary.data.reduce((sum, sale) => sum + sale.amount, 0))}
+                      </td>
+                      <td className="px-6 py-3"></td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {dailyRevenue.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
-                          No transactions in the last 30 days
-                        </td>
-                      </tr>
-                    ) : (
-                      dailyRevenue.map((item) => (
-                        <tr key={item.date} className="hover:bg-gray-50">
-                          <td className="px-6 py-3 font-medium text-gray-900">{formatDate(item.date)}</td>
-                          <td className="px-6 py-3 text-center text-gray-700">{item.invoice_count}</td>
-                          <td className="px-6 py-3 text-right font-semibold text-green-600">{formatCurrency(item.revenue)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                  </tfoot>
+                )}
+              </table>
             </div>
+            
+            {/* Pagination */}
+            {salesSummary.last_page > 1 && (
+              <div className="px-6 py-4 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-500">
+                    Showing {((salesSummary.current_page - 1) * salesSummary.per_page) + 1} to {Math.min(salesSummary.current_page * salesSummary.per_page, salesSummary.total)} of {salesSummary.total} results
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={salesSummary.current_page === 1}
+                      onClick={() => {
+                        const params = new URLSearchParams(window.location.search);
+                        params.set('page', (salesSummary.current_page - 1).toString());
+                        router.get(`/reports?${params.toString()}`);
+                      }}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-500">
+                      Page {salesSummary.current_page} of {salesSummary.last_page}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={salesSummary.current_page === salesSummary.last_page}
+                      onClick={() => {
+                        const params = new URLSearchParams(window.location.search);
+                        params.set('page', (salesSummary.current_page + 1).toString());
+                        router.get(`/reports?${params.toString()}`);
+                      }}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Additional Tables */}
