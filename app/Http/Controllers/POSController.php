@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\InvoicePayment;
+use App\Models\MembershipPackage;
 use App\Models\Package;
 use App\Models\Product;
 use Carbon\Carbon;
@@ -28,6 +29,10 @@ class POSController extends Controller
 
         $packages = Package::orderBy('name')->get();
         $customers = Customer::orderBy('name')->get();
+        $membershipPackages = MembershipPackage::with('package')
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
 
         // Get active invoice for selected bed if any
         $selectedBedId = $request->get('bed_id');
@@ -128,6 +133,7 @@ class POSController extends Controller
             'beds' => $beds,
             'packages' => $packages,
             'customers' => $customers,
+            'membershipPackages' => $membershipPackages,
             'activeInvoice' => $activeInvoice,
             'selectedBedId' => $selectedBedId,
             'loadedBooking' => $loadedBooking,
@@ -691,6 +697,15 @@ class POSController extends Controller
                     $bedId = $allocation->bed_id;
                     $now = now();
                     
+                    // Check if this booking used a membership package - if so, deduct a session
+                    if ($allocation->membership_package_id) {
+                        $membershipPackage = MembershipPackage::find($allocation->membership_package_id);
+                        if ($membershipPackage && $membershipPackage->isActive()) {
+                            $membershipPackage->useSession();
+                            \Log::info("Session deducted from membership package #{$membershipPackage->id} for allocation #{$allocationId}");
+                        }
+                    }
+                    
                     // Determine new booking status based on timing
                     // If booking start_time <= now <= end_time, it's in_progress
                     // If booking hasn't started yet, it's confirmed (will start later)
@@ -756,13 +771,35 @@ class POSController extends Controller
         $invoice->markAsCompleted(auth()->id());
 
         if ($invoice->allocation) {
-            $invoice->allocation->update([
-                'status' => 'completed',
+            $allocation = $invoice->allocation;
+            $bedId = $allocation->bed_id;
+            $now = now();
+            
+            // Check if this booking used a membership package - if so, deduct a session
+            if ($allocation->membership_package_id) {
+                $membershipPackage = MembershipPackage::find($allocation->membership_package_id);
+                if ($membershipPackage && $membershipPackage->isActive()) {
+                    $membershipPackage->useSession();
+                    \Log::info("Session deducted from membership package #{$membershipPackage->id} for allocation #{$allocation->id}");
+                }
+            }
+            
+            // Determine new booking status based on timing (same logic as processPayment)
+            // If booking start_time <= now <= end_time, it's in_progress
+            // If booking hasn't started yet, it's confirmed (will start later)
+            $newStatus = 'confirmed';
+            if ($allocation->start_time <= $now && $allocation->end_time >= $now) {
+                $newStatus = 'in_progress';
+            }
+            
+            // Update allocation: payment_status -> paid, status based on timing
+            $allocation->update([
+                'status' => $newStatus,
                 'payment_status' => 'paid',
             ]);
             
-            // Update bed status in database immediately
-            $this->updateBedStatus($invoice->allocation->bed_id);
+            // Update bed status based on new booking status
+            $this->updateBedStatusAfterPayment($bedId, $newStatus);
         }
 
         // Get updated beds list with status

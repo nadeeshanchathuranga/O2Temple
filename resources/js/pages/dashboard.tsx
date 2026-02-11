@@ -8,7 +8,8 @@ import {
     BarChart3,
     Activity,
     Calendar,
-    UserCog
+    UserCog,
+    Briefcase
 } from 'lucide-react';
 
 import HeaderLayout from '@/layouts/header-layout';
@@ -48,6 +49,15 @@ const dashboardModules = [
         color: 'bg-gradient-to-br from-blue-400 to-blue-600',
         textColor: 'text-white',
         href: '/packages'
+    },
+    {
+        id: 'membership-packages',
+        title: 'COMPANY & INDIVIDUAL PACKAGE',
+        description: 'Manage membership packages for companies and individuals',
+        icon: Briefcase,
+        color: 'bg-gradient-to-br from-cyan-400 to-cyan-600',
+        textColor: 'text-white',
+        href: '/membership-packages'
     },
      {
         id: 'booking-management',

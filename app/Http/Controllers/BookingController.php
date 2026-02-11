@@ -6,6 +6,7 @@ use App\Models\BedAllocation;
 use App\Models\Bed;
 use App\Models\Package;
 use App\Models\Customer;
+use App\Models\MembershipPackage;
 use App\Services\BedAvailabilityService;
 use App\Models\AdvancePayment;
 use Illuminate\Http\Request;
@@ -65,11 +66,18 @@ class BookingController extends Controller
         $beds = Bed::where('status', '!=', 'maintenance')->get();
         $packages = Package::orderBy('duration_minutes')->get();
         $customers = Customer::orderBy('name')->get();
+        
+        // Get active membership packages
+        $membershipPackages = MembershipPackage::with('package')
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
 
         return Inertia::render('BookingManagement/Create', [
             'beds' => $beds,
             'packages' => $packages,
             'customers' => $customers,
+            'membershipPackages' => $membershipPackages,
         ]);
     }
 
@@ -139,7 +147,8 @@ class BookingController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'customer_id' => 'required|exists:customers,id',
+            'customer_id' => 'nullable|exists:customers,id',
+            'membership_package_id' => 'nullable|exists:membership_packages,id',
             'bed_id' => 'required|exists:beds,id',
             'package_id' => 'required|exists:packages,id',
             'start_time' => 'required|date|after:now',
@@ -148,6 +157,26 @@ class BookingController extends Controller
             'payment_method' => 'required_with:advance_payment|in:cash,card,bank_transfer',
             'payment_reference' => 'nullable|string|max:255',
         ]);
+        
+        // Validate that either customer_id or membership_package_id is provided
+        if (empty($validated['customer_id']) && empty($validated['membership_package_id'])) {
+            return back()->withErrors(['customer_id' => 'Please select either a customer or a membership package.']);
+        }
+        
+        // If membership package is selected, use its session
+        if ($validated['membership_package_id']) {
+            $membershipPackage = MembershipPackage::findOrFail($validated['membership_package_id']);
+            
+            // Check if membership package has remaining sessions
+            if ($membershipPackage->sessions_used >= $membershipPackage->num_of_sessions) {
+                return back()->withErrors(['membership_package_id' => 'This membership package has no remaining sessions.']);
+            }
+            
+            // Check if membership package is active
+            if ($membershipPackage->status !== 'active') {
+                return back()->withErrors(['membership_package_id' => 'This membership package is not active.']);
+            }
+        }
 
         $now = now();
         $requestedStart = Carbon::parse($validated['start_time']);
@@ -194,9 +223,26 @@ class BookingController extends Controller
 
         DB::beginTransaction();
         try {
+            // Determine customer ID
+            $customerId = $validated['customer_id'];
+            if ($validated['membership_package_id']) {
+                $membershipPackage = MembershipPackage::findOrFail($validated['membership_package_id']);
+                
+                // Create a customer record if using membership package
+                $customer = Customer::firstOrCreate(
+                    ['phone' => $membershipPackage->phone],
+                    [
+                        'name' => $membershipPackage->name,
+                        'email' => null,
+                    ]
+                );
+                $customerId = $customer->id;
+            }
+            
             // Create booking with pending status (no payment yet)
             $booking = BedAllocation::create([
-                'customer_id' => $validated['customer_id'],
+                'customer_id' => $customerId,
+                'membership_package_id' => $validated['membership_package_id'] ?? null,
                 'bed_id' => $validated['bed_id'],
                 'package_id' => $validated['package_id'],
                 'start_time' => $validated['start_time'],
@@ -212,7 +258,7 @@ class BookingController extends Controller
             if ($advanceAmount > 0) {
                 AdvancePayment::create([
                     'allocation_id' => $booking->id,
-                    'customer_id' => $validated['customer_id'],
+                    'customer_id' => $customerId,
                     'amount' => $advanceAmount,
                     'payment_method' => $validated['payment_method'] ?? 'cash',
                     'reference_number' => $validated['payment_reference'] ?? null,
@@ -233,6 +279,11 @@ class BookingController extends Controller
             $bedAvailabilityService->updateBedTableStatuses();
 
             $successMessage = 'Booking created successfully!';
+            if ($validated['membership_package_id']) {
+                $membershipPackage = MembershipPackage::find($validated['membership_package_id']);
+                $remainingSessions = $membershipPackage->num_of_sessions - $membershipPackage->sessions_used;
+                $successMessage .= " Session will be deducted when payment is completed via POS. {$remainingSessions} sessions remaining.";
+            }
             if ($advanceAmount > 0) {
                 $successMessage .= ' Advance payment of LKR ' . number_format($advanceAmount, 2) . ' recorded.';
             }

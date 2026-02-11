@@ -6,6 +6,7 @@ use Laravel\Fortify\Features;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\BedManagementController;
 use App\Http\Controllers\PackageController;
+use App\Http\Controllers\MembershipPackageController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\POSController;
 use App\Http\Controllers\PaymentHistoryController;
@@ -110,6 +111,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('customers', CustomerController::class)->except(['create', 'edit']);
     Route::resource('beds', BedManagementController::class);
     Route::resource('packages', PackageController::class);
+    
+    // Membership Packages Routes
+    Route::resource('membership-packages', MembershipPackageController::class)->except(['create', 'edit']);
+    Route::post('membership-packages/{membershipPackage}/use-session', [MembershipPackageController::class, 'useSession'])
+        ->name('membership-packages.use-session');
+    Route::post('membership-packages/{membershipPackage}/settle-payment', [MembershipPackageController::class, 'settlePayment'])
+        ->name('membership-packages.settle-payment');
 });
 
 // User Management Routes (Admin only)

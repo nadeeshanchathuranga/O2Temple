@@ -14,6 +14,7 @@ class BedAllocation extends Model
     protected $fillable = [
         'booking_number',
         'customer_id',
+        'membership_package_id',
         'bed_id',
         'package_id',
         'start_time',
@@ -93,6 +94,14 @@ class BedAllocation extends Model
     public function package(): BelongsTo
     {
         return $this->belongsTo(Package::class);
+    }
+
+    /**
+     * Get the membership package that owns the allocation.
+     */
+    public function membershipPackage(): BelongsTo
+    {
+        return $this->belongsTo(MembershipPackage::class);
     }
 
     /**

@@ -50,6 +50,20 @@ interface Package {
   price: number;
 }
 
+interface MembershipPackage {
+  id: number;
+  type: string;
+  name: string;
+  phone: string;
+  num_of_sessions: number;
+  sessions_used: number;
+  remaining_sessions: number;
+  full_payment: number;
+  remaining_balance: number;
+  status: string;
+  package: Package;
+}
+
 interface Customer {
   id: number;
   name: string;
@@ -148,6 +162,7 @@ interface Props {
   beds: Bed[];
   packages: Package[];
   customers: Customer[];
+  membershipPackages: MembershipPackage[];
   activeInvoice?: Invoice | null;
   selectedBedId?: number | null;
   loadedBooking?: Booking | null;
@@ -157,6 +172,7 @@ const POSBilling: React.FC<Props> = ({
   beds: initialBeds,
   packages, 
   customers: initialCustomers,
+  membershipPackages,
   activeInvoice: initialInvoice,
   selectedBedId: initialSelectedBedId,
   loadedBooking,
@@ -256,6 +272,12 @@ const POSBilling: React.FC<Props> = ({
       const bed = beds.find(b => b.id === loadedBooking.bed.id);
       if (bed) {
         setSelectedBed(bed);
+      }
+      
+      // Auto-select the package to highlight it in the packages section
+      const packageToSelect = packages.find(p => p.id === loadedBooking.package.id);
+      if (packageToSelect) {
+        setSelectedPackageForBooking(packageToSelect);
       }
       
       // If invoice is already provided from backend (with advance payment handling), use it
@@ -363,6 +385,41 @@ const POSBilling: React.FC<Props> = ({
   // Process payment
   const handleProcessPayment = async () => {
     if (!invoice) return;
+    
+    // Check if balance is already 0 (100% discount) - complete invoice directly
+    if (invoice.balance_amount <= 0) {
+      setIsLoading(true);
+      try {
+        const response = await axios.post(`/pos/invoices/${invoice.id}/complete`, {});
+        
+        if (response.data.success) {
+          setInvoice(response.data.invoice);
+          setShowPaymentModal(false);
+          
+          // Update beds list if provided
+          if (response.data.beds) {
+            setBeds(response.data.beds);
+            
+            // Update selected bed if it exists
+            if (selectedBed) {
+              const updatedBed = response.data.beds.find((b: Bed) => b.id === selectedBed.id);
+              if (updatedBed) {
+                setSelectedBed(updatedBed);
+              }
+            }
+          }
+          
+          alert('Order completed successfully (100% discount applied)!');
+          // Redirect to POS page
+          router.visit('/pos');
+        }
+      } catch (error: any) {
+        alert(error.response?.data?.message || 'Failed to complete order');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
     
     // Build payments array based on payment type
     const paymentsToProcess: { amount: number; payment_method: string; reference_number: string | null }[] = [];
@@ -647,7 +704,44 @@ const POSBilling: React.FC<Props> = ({
 
   // Process payment directly from billing section
   const handleDirectPayment = async () => {
-    if (!invoice || !canProcessPayment()) return;
+    if (!invoice) return;
+    
+    // Check if balance is already 0 (100% discount) - complete invoice directly
+    if (invoice.balance_amount <= 0) {
+      setIsLoading(true);
+      try {
+        const response = await axios.post(`/pos/invoices/${invoice.id}/complete`, {});
+        
+        if (response.data.success) {
+          setInvoice(response.data.invoice);
+          
+          // Update beds list if provided
+          if (response.data.beds) {
+            setBeds(response.data.beds);
+            
+            // Update selected bed if it exists
+            if (selectedBed) {
+              const updatedBed = response.data.beds.find((b: Bed) => b.id === selectedBed.id);
+              if (updatedBed) {
+                setSelectedBed(updatedBed);
+              }
+            }
+          }
+          
+          alert('Payment completed successfully (100% discount applied)!');
+          // Redirect to POS page
+          router.visit('/pos');
+        }
+      } catch (error: any) {
+        alert(error.response?.data?.message || 'Failed to complete payment');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+    
+    // For non-zero balance, check if payment can be processed
+    if (!canProcessPayment()) return;
     
     const paymentsToProcess: { amount: number; payment_method: string; reference_number: string | null }[] = [];
     
@@ -964,6 +1058,90 @@ const POSBilling: React.FC<Props> = ({
                 </div>
               </div>
 
+              {/* Membership Packages Section - Pre-paid packages for existing members */}
+              <div className="bg-white rounded-lg shadow-sm">
+                <div className="p-4 border-b border-gray-200">
+                  <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                    💎 <span>Membership Packages</span>
+                    <span className="text-xs text-gray-500 font-normal ml-2">Pre-paid packages - select a customer first</span>
+                  </h2>
+                </div>
+
+                <div className="p-4">
+                  {selectedCustomer ? (
+                    (() => {
+                      const customerPackages = membershipPackages.filter(pkg => 
+                        pkg.phone === selectedCustomer.phone && pkg.status === 'active' && pkg.remaining_sessions > 0
+                      );
+                      
+                      return customerPackages.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-4">
+                          {customerPackages.map((membershipPkg) => (
+                            <button
+                              key={membershipPkg.id}
+                              onClick={() => {
+                                // Create a customer booking with this membership package
+                                if (selectedBed && selectedBed.status === 'available') {
+                                  alert('Feature coming soon: Direct membership package booking from POS');
+                                } else {
+                                  alert('Please select an available bed first');
+                                }
+                              }}
+                              className="p-4 border-2 border-purple-200 hover:border-purple-400 hover:bg-purple-50 rounded-xl text-left transition-all group"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-purple-700 group-hover:text-purple-800">
+                                    {membershipPkg.package.name}
+                                  </h3>
+                                  <p className="text-sm text-gray-600 mt-1">
+                                    {membershipPkg.type === 'individual' ? '👤' : '🏢'} {membershipPkg.name}
+                                  </p>
+                                  <p className="text-xs text-gray-500 flex items-center mt-1">
+                                    <ClockIcon className="w-3 h-3 mr-1" />
+                                    {membershipPkg.package.duration_minutes} min
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="mt-3 flex items-center justify-between">
+                                <div className="text-sm">
+                                  <span className="text-green-600 font-bold">
+                                    {membershipPkg.remaining_sessions} sessions left
+                                  </span>
+                                  <span className="text-gray-500 text-xs block">
+                                    of {membershipPkg.num_of_sessions} total
+                                  </span>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-lg font-bold text-purple-600">
+                                    FREE
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    Pre-paid
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-8 text-center text-gray-400">
+                          <span className="text-4xl">💎</span>
+                          <p className="text-sm mt-2">No active membership packages</p>
+                          <p className="text-xs mt-1">Customer has no pre-paid sessions available</p>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div className="text-center py-8 text-gray-400">
+                      <span className="text-4xl">👤</span>
+                      <p className="text-sm mt-2">Select a customer first</p>
+                      <p className="text-xs mt-1">Choose a customer to see their membership packages</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Services Section - Available as add-ons */}
               <div className="bg-white rounded-lg shadow-sm">
                 <div className="p-4 border-b border-gray-200">
@@ -1097,24 +1275,25 @@ const POSBilling: React.FC<Props> = ({
                     {/* Discount */}
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-900 font-medium w-24">Discount</span>
-                      <Select 
-                        value={discountPercent.toString()} 
-                        onValueChange={(val) => {
-                          setDiscountPercent(parseInt(val));
-                          setTimeout(handleUpdateInvoice, 100);
-                        }}
-                      >
-                        <SelectTrigger className="flex-1 h-8">
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">No Discount</SelectItem>
-                          <SelectItem value="5">5%</SelectItem>
-                          <SelectItem value="10">10%</SelectItem>
-                          <SelectItem value="15">15%</SelectItem>
-                          <SelectItem value="20">20%</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex-1 flex items-center gap-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={discountPercent || ''}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            if (val >= 0 && val <= 100) {
+                              setDiscountPercent(val);
+                            }
+                          }}
+                          onBlur={handleUpdateInvoice}
+                          placeholder="0"
+                          className="h-8 text-sm text-gray-900"
+                        />
+                        <span className="text-sm text-gray-600 whitespace-nowrap">%</span>
+                      </div>
                       <span className="text-sm font-semibold w-24 text-right text-gray-900">
                         -{formatCurrency(invoice?.discount_amount || 0)}
                       </span>
@@ -1158,6 +1337,26 @@ const POSBilling: React.FC<Props> = ({
                       <span className="text-lg font-bold text-gray-900">Total</span>
                       <span className="text-lg font-bold text-teal-600">{formatCurrency(invoice?.total_amount || 0)}</span>
                     </div>
+
+                    {/* Advance Payment Display - Show if booking has advance payment */}
+                    {invoice && invoice.allocation && loadedBooking && loadedBooking.advance_paid && loadedBooking.advance_paid > 0 && (
+                      <div className="pt-3 border-t border-dashed border-blue-300 bg-blue-50 -mx-4 px-4 py-3 rounded-lg">
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-blue-700 font-medium">📌 Original Package Price</span>
+                            <span className="font-semibold text-blue-900">{formatCurrency(loadedBooking.total_amount || 0)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-green-600 font-medium">✓ Advance Paid</span>
+                            <span className="font-semibold text-green-600">-{formatCurrency(loadedBooking.advance_paid)}</span>
+                          </div>
+                          <div className="flex justify-between pt-2 border-t border-blue-200">
+                            <span className="font-bold text-blue-900">Balance to Pay</span>
+                            <span className="font-bold text-orange-600">{formatCurrency(loadedBooking.balance_amount || 0)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Paid & Balance with Payment Breakdown */}
                     {invoice && invoice.paid_amount > 0 && (
@@ -1389,7 +1588,7 @@ const POSBilling: React.FC<Props> = ({
                     {invoice && invoice.payment_status !== 'paid' && (
                       <Button
                         className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 text-base font-semibold"
-                        disabled={!invoice || invoice.subtotal === 0 || !canProcessPayment() || isLoading}
+                        disabled={!invoice || invoice.subtotal === 0 || (invoice.balance_amount > 0 && !canProcessPayment()) || isLoading}
                         onClick={handleDirectPayment}
                       >
                         {isLoading ? (
