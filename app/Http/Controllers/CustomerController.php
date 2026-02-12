@@ -48,6 +48,7 @@ class CustomerController extends Controller
                     'name' => $membership->name,
                     'phone' => $membership->phone,
                     'email' => null,
+                    'dob' => $membership->birthday,
                     'type' => 'membership',
                     'membership_status' => $membership->status,
                     'remaining_sessions' => $membership->remaining_sessions,
@@ -56,14 +57,20 @@ class CustomerController extends Controller
                 ];
             });
 
-        // Combine and paginate manually
+        // Combine and sort with birthday priority
         $allCustomers = collect($customers->toArray())
             ->map(function ($customer) {
                 $customer['type'] = 'regular';
+                $customer['dob'] = $customer['dob'] ?? null;
                 return $customer;
             })
             ->merge($membershipCustomers)
-            ->sortBy('name')
+            ->sortBy([
+                // First sort by birthday (today's birthdays first)
+                fn($customer) => $this->isBirthday($customer['dob']) ? 0 : 1,
+                // Then sort by name
+                fn($customer) => strtolower($customer['name'])
+            ])
             ->values();
 
         // Manual pagination
@@ -301,5 +308,19 @@ class CustomerController extends Controller
         return Inertia::render('CustomerManagement/Show', [
             'customer' => $customerData,
         ]);
+    }
+
+    /**
+     * Check if today is the customer's birthday
+     */
+    private function isBirthday($dob)
+    {
+        if (!$dob) return false;
+        
+        $today = now();
+        $birthDate = \Carbon\Carbon::parse($dob);
+        
+        return $today->month === $birthDate->month && 
+               $today->day === $birthDate->day;
     }
 }

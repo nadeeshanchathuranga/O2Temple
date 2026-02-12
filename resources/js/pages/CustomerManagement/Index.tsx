@@ -17,6 +17,7 @@ interface Customer {
   name: string;
   phone: string;
   email?: string;
+  dob?: string;
   type: 'regular' | 'membership';
   membership_status?: string;
   remaining_sessions?: number;
@@ -42,6 +43,17 @@ const CustomerManagement: React.FC<Props> = ({ customers, filters }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+
+  // Check if today is customer's birthday
+  const isBirthday = (dob: string | undefined) => {
+    if (!dob) return false;
+    
+    const today = new Date();
+    const birthDate = new Date(dob);
+    
+    return today.getMonth() === birthDate.getMonth() && 
+           today.getDate() === birthDate.getDate();
+  };
 
   // Search form
   const { data: searchData, setData: setSearchData } = useForm({
@@ -141,13 +153,30 @@ const CustomerManagement: React.FC<Props> = ({ customers, filters }) => {
 
             {/* Table Body */}
             <div className="divide-y divide-gray-200">
-              {customers.data.map((customer, index) => (
-                <div key={customer.id} className="grid grid-cols-7 gap-4 px-6 py-4 items-center hover:bg-gray-50 transition-colors">
-                  <div className="text-sm text-gray-500 font-medium">
-                    {customers.meta ? (customers.meta.current_page - 1) * customers.meta.per_page + index + 1 : index + 1}
-                  </div>
+              {customers.data.map((customer, index) => {
+                const isCustomerBirthday = isBirthday(customer.dob);
+                
+                return (
+                  <div 
+                    key={customer.id} 
+                    className={`grid grid-cols-7 gap-4 px-6 py-4 items-center transition-colors ${
+                      isCustomerBirthday 
+                        ? 'bg-yellow-50 hover:bg-yellow-100 border-l-4 border-l-yellow-400' 
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="text-sm text-gray-500 font-medium">
+                      {customers.meta ? (customers.meta.current_page - 1) * customers.meta.per_page + index + 1 : index + 1}
+                    </div>
 
-                  <div className="text-gray-700 font-medium">{customer.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-700 font-medium">{customer.name}</span>
+                      {isCustomerBirthday && (
+                        <span className="text-lg animate-pulse" title="Happy Birthday! 🎉">
+                          🎂
+                        </span>
+                      )}
+                    </div>
                   <div className="text-gray-700">{customer.phone}</div>
                   
                   <div>
@@ -222,7 +251,8 @@ const CustomerManagement: React.FC<Props> = ({ customers, filters }) => {
                     )}
                   </div>
                 </div>
-              ))}
+              );
+            })}
             </div>
 
             {customers.data.length === 0 && (
