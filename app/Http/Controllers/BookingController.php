@@ -89,12 +89,19 @@ class BookingController extends Controller
         $bedId = $request->bed_id;
         $date = Carbon::parse($request->date);
         $packageDuration = (int) $request->package_duration; // in minutes
+        $excludeBooking = $request->exclude_booking; // ID of booking to exclude (for editing)
 
         // Get all bookings for the selected bed on the selected date
-        $existingBookings = BedAllocation::where('bed_id', $bedId)
+        $existingBookingsQuery = BedAllocation::where('bed_id', $bedId)
             ->whereDate('start_time', $date)
-            ->where('status', '!=', 'cancelled')
-            ->get(['start_time', 'end_time']);
+            ->where('status', '!=', 'cancelled');
+            
+        // Exclude specific booking if editing
+        if ($excludeBooking) {
+            $existingBookingsQuery->where('id', '!=', $excludeBooking);
+        }
+        
+        $existingBookings = $existingBookingsQuery->get(['start_time', 'end_time']);
 
         // Define business hours (8 AM to 10 PM)
         $businessStart = $date->copy()->setTime(8, 0);
@@ -332,6 +339,95 @@ class BookingController extends Controller
         }
 
         return back()->with('success', 'Payment status updated successfully!');
+    }
+
+    /**
+     * Show the form for editing the specified booking.
+     */
+    public function edit(BedAllocation $booking)
+    {
+        $booking->load(['customer', 'bed', 'package', 'membershipPackage']);
+        
+        // Get available beds for the edit form
+        $beds = Bed::orderBy('bed_number')->get();
+        
+        // Get available packages
+        $packages = Package::orderBy('name')->get();
+        
+        // Get customers for dropdown
+        $customers = Customer::orderBy('name')->get();
+        
+        // Get membership packages to check if customer has any
+        $membershipPackages = MembershipPackage::with('package')
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get();
+
+        return Inertia::render('BookingManagement/Edit', [
+            'booking' => $booking,
+            'beds' => $beds,
+            'packages' => $packages,
+            'customers' => $customers,
+            'membershipPackages' => $membershipPackages,
+        ]);
+    }
+
+    /**
+     * Update the specified booking in storage.
+     */
+    public function update(Request $request, BedAllocation $booking)
+    {
+        $validated = $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'bed_id' => 'required|exists:beds,id',
+            'package_id' => 'required|exists:packages,id',
+            'start_time' => 'required|date',
+            'status' => 'required|in:pending,confirmed,in_progress,completed,cancelled',
+            'payment_status' => 'required|in:pending,paid,refunded',
+            'membership_package_id' => 'nullable|exists:membership_packages,id',
+        ]);
+
+        // Get package for duration calculation
+        $package = Package::findOrFail($validated['package_id']);
+        $startTime = Carbon::parse($validated['start_time']);
+        $endTime = $startTime->copy()->addMinutes($package->duration_minutes);
+
+        // Check if bed is available for new time slot (exclude current booking)
+        $conflictingBooking = BedAllocation::where('bed_id', $validated['bed_id'])
+            ->where('id', '!=', $booking->id)
+            ->whereIn('status', ['confirmed', 'in_progress'])
+            ->where(function ($query) use ($startTime, $endTime) {
+                $query->whereBetween('start_time', [$startTime, $endTime])
+                      ->orWhereBetween('end_time', [$startTime, $endTime])
+                      ->orWhere(function ($subQuery) use ($startTime, $endTime) {
+                          $subQuery->where('start_time', '<=', $startTime)
+                                   ->where('end_time', '>=', $endTime);
+                      });
+            })
+            ->exists();
+
+        if ($conflictingBooking) {
+            return back()->withErrors(['start_time' => 'Selected bed is not available for this time slot.']);
+        }
+
+        // Update the booking
+        $booking->update([
+            'customer_id' => $validated['customer_id'],
+            'bed_id' => $validated['bed_id'], 
+            'package_id' => $validated['package_id'],
+            'membership_package_id' => $validated['membership_package_id'],
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'status' => $validated['status'],
+            'payment_status' => $validated['payment_status'],
+            'total_amount' => $package->price,
+        ]);
+
+        // Update bed status
+        $bedAvailabilityService = new BedAvailabilityService();
+        $bedAvailabilityService->updateBedTableStatuses();
+
+        return redirect()->route('bookings.index')->with('success', 'Booking updated successfully!');
     }
 
     /**

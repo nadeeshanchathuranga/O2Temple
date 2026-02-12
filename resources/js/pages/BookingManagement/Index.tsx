@@ -11,6 +11,7 @@ import {
   CalendarIcon,
   XCircleIcon,
   CreditCardIcon,
+  PencilIcon,
 } from '@heroicons/react/24/outline';
 import HeaderLayout from '@/layouts/header-layout';
 
@@ -300,6 +301,18 @@ const BookingManagement: React.FC<Props> = ({ bookings, filters }) => {
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         {getStatusBadge(booking.status)}
+                        {/* Edit button */}
+                        {booking.status !== 'completed' && booking.status !== 'cancelled' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => router.get(`/bookings/${booking.id}/edit`)}
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-1"
+                            title="Edit Booking"
+                          >
+                            <PencilIcon className="w-4 h-4" />
+                          </Button>
+                        )}
                         {canCancel(booking) && (
                           <Button
                             size="sm"
