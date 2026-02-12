@@ -211,6 +211,7 @@ class Invoice extends Model
     {
         $this->update([
             'status' => 'completed',
+            'payment_status' => 'paid',
             'completed_by' => $userId,
             'completed_at' => now(),
         ]);

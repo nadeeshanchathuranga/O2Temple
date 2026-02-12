@@ -13,31 +13,39 @@ class BedSeeder extends Seeder
      */
     public function run(): void
     {
-        $beds = [];
-        $row = 1;
-        $col = 1;
-        
-        for ($i = 1; $i <= 25; $i++) {
-            $beds[] = [
-                'bed_number' => (string) $i,
-                'display_name' => 'Table ' . $i,
-                'grid_row' => $row,
-                'grid_col' => $col,
-                'bed_type' => $i <= 5 ? 'vip' : 'standard',
-                'hourly_rate' => $i <= 5 ? 2000.00 : 1500.00,
+        $beds = [
+            [
+                'bed_number' => 'S1',
+                'display_name' => 'Bed S1',
+                'grid_row' => 1,
+                'grid_col' => 1,
+                'bed_type' => 'standard',
+                'hourly_rate' => 1500.00,
                 'status' => 'available',
-                'description' => $i <= 5 ? 'VIP Table with premium amenities' : 'Standard table',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-            
-            $col++;
-            if ($col > 5) {
-                $col = 1;
-                $row++;
-            }
-        }
-        
+                'description' => 'Standard therapy bed',
+            ],
+            [
+                'bed_number' => 'S2',
+                'display_name' => 'Bed S2',
+                'grid_row' => 1,
+                'grid_col' => 2,
+                'bed_type' => 'standard',
+                'hourly_rate' => 1500.00,
+                'status' => 'available',
+                'description' => 'Standard therapy bed',
+            ],
+            [
+                'bed_number' => 'S3',
+                'display_name' => 'Bed S3',
+                'grid_row' => 1,
+                'grid_col' => 3,
+                'bed_type' => 'vip',
+                'hourly_rate' => 2000.00,
+                'status' => 'available',
+                'description' => 'VIP therapy bed with premium amenities',
+            ],
+        ];
+
         foreach ($beds as $bed) {
             Bed::updateOrCreate(
                 ['bed_number' => $bed['bed_number']],

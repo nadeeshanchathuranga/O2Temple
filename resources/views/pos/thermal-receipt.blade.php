@@ -234,7 +234,31 @@
     @endif
 
     <div class="totals">
-        @if($hasAdvancePayment && $originalPackagePrice > 0)
+        @if($membershipPackage)
+            {{-- Membership Package - Show session info instead of totals --}}
+            <div class="total-row" style="font-weight: bold;">
+                <span>Membership Package</span>
+                <span></span>
+            </div>
+            <div class="total-row">
+                <span>Total Sessions:</span>
+                <span>{{ $membershipPackage->num_of_sessions }}</span>
+            </div>
+            <div class="total-row">
+                <span>Sessions Used:</span>
+                <span>{{ $membershipPackage->sessions_used }}</span>
+            </div>
+            <div class="total-row" style="font-weight: bold;">
+                <span>Remaining Sessions:</span>
+                <span>{{ $membershipPackage->remaining_sessions }}</span>
+            </div>
+            @if($membershipPackage->remaining_balance > 0)
+            <div class="total-row" style="margin-top: 4px; border-top: 1px dashed #000; padding-top: 2px;">
+                <span>Package Balance:</span>
+                <span>LKR {{ number_format($membershipPackage->remaining_balance, 2) }}</span>
+            </div>
+            @endif
+        @elseif($hasAdvancePayment && $originalPackagePrice > 0)
             <div class="total-row">
                 <span>Package Price:</span>
                 <span>LKR {{ number_format($originalPackagePrice, 2) }}</span>
@@ -254,29 +278,31 @@
             </div>
         @endif
         
-        @if($invoice->discount_amount > 0)
-        <div class="total-row">
-            <span>Discount:</span>
-            <span>-LKR {{ number_format($invoice->discount_amount, 2) }}</span>
-        </div>
+        @if(!$membershipPackage)
+            @if($invoice->discount_amount > 0)
+            <div class="total-row">
+                <span>Discount:</span>
+                <span>-LKR {{ number_format($invoice->discount_amount, 2) }}</span>
+            </div>
+            @endif
+            @if($invoice->service_charge > 0)
+            <div class="total-row">
+                <span>Service Charge:</span>
+                <span>LKR {{ number_format($invoice->service_charge, 2) }}</span>
+            </div>
+            @endif
+            @if($invoice->tax_amount > 0)
+            <div class="total-row">
+                <span>Tax:</span>
+                <span>LKR {{ number_format($invoice->tax_amount, 2) }}</span>
+            </div>
+            @endif
+            
+            <div class="total-row grand-total">
+                <span>TOTAL:</span>
+                <span>LKR {{ number_format($hasAdvancePayment ? $originalPackagePrice : $invoice->total_amount, 2) }}</span>
+            </div>
         @endif
-        @if($invoice->service_charge > 0)
-        <div class="total-row">
-            <span>Service Charge:</span>
-            <span>LKR {{ number_format($invoice->service_charge, 2) }}</span>
-        </div>
-        @endif
-        @if($invoice->tax_amount > 0)
-        <div class="total-row">
-            <span>Tax:</span>
-            <span>LKR {{ number_format($invoice->tax_amount, 2) }}</span>
-        </div>
-        @endif
-        
-        <div class="total-row grand-total">
-            <span>TOTAL:</span>
-            <span>LKR {{ number_format($hasAdvancePayment ? $originalPackagePrice : $invoice->total_amount, 2) }}</span>
-        </div>
     </div>
 
     @if($hasAdvancePayment && isset($advancePayments) && $advancePayments->count() > 0)
@@ -291,7 +317,7 @@
     </div>
     @endif
 
-    @if($invoice->payments->isNotEmpty())
+    @if(!$membershipPackage && $invoice->payments->isNotEmpty())
     <div class="payment-info">
         <div class="bold center">{{ $hasAdvancePayment ? 'BALANCE PAYMENTS' : 'PAYMENTS' }}</div>
         @foreach($invoice->payments as $payment)

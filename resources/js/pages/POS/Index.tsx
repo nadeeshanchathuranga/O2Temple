@@ -57,7 +57,7 @@ interface MembershipPackage {
   phone: string;
   num_of_sessions: number;
   sessions_used: number;
-  remaining_sessions: number;
+  remaining_sessions: number; // Now always available from backend
   full_payment: number;
   remaining_balance: number;
   status: string;
@@ -185,6 +185,7 @@ const POSBilling: React.FC<Props> = ({
     initialSelectedBedId ? initialBeds.find(b => b.id === initialSelectedBedId) || null : null
   );
   const [selectedPackageForBooking, setSelectedPackageForBooking] = useState<Package | null>(null);
+  const [selectedMembershipPackage, setSelectedMembershipPackage] = useState<MembershipPackage | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(initialInvoice || null);
   const [showBookingSearch, setShowBookingSearch] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
@@ -261,6 +262,47 @@ const POSBilling: React.FC<Props> = ({
     }, 300);
     return () => clearTimeout(timer);
   }, [bookingSearchQuery, handleBookingSearch]);
+
+  // Auto-check for membership when customer or package selection changes
+  useEffect(() => {
+    if (selectedCustomer && selectedPackageForBooking) {
+      const customerMembership = membershipPackages.find(mp => 
+        mp.phone === selectedCustomer.phone && 
+        mp.package.id === selectedPackageForBooking.id && 
+        mp.status === 'active' &&
+        mp.remaining_sessions > 0
+      );
+      
+      if (customerMembership) {
+        setSelectedMembershipPackage(customerMembership);
+      } else {
+        setSelectedMembershipPackage(null);
+      }
+    } else {
+      setSelectedMembershipPackage(null);
+    }
+  }, [selectedCustomer, selectedPackageForBooking, membershipPackages]);
+
+  // Auto-select package when customer with membership is selected
+  useEffect(() => {
+    if (selectedCustomer && !selectedPackageForBooking) {
+      // Find active membership for this customer
+      const customerMembership = membershipPackages.find(mp => 
+        mp.phone === selectedCustomer.phone && 
+        mp.status === 'active' &&
+        mp.remaining_sessions > 0
+      );
+      
+      if (customerMembership) {
+        // Auto-select the package from the membership
+        const pkg = packages.find(p => p.id === customerMembership.package.id);
+        if (pkg) {
+          setSelectedPackageForBooking(pkg);
+          setSelectedMembershipPackage(customerMembership);
+        }
+      }
+    }
+  }, [selectedCustomer, membershipPackages, packages, selectedPackageForBooking]);
 
   // Auto-load booking if navigating from Booking Management
   useEffect(() => {
@@ -575,7 +617,10 @@ const POSBilling: React.FC<Props> = ({
 
   // Handle bed click
   const handleBedClick = async (bed: Bed) => {
-    if (bed.status === 'maintenance') return;
+    if (bed.status === 'maintenance') {
+      alert('This bed is under maintenance.');
+      return;
+    }
     
     // If bed has a pending (unpaid) allocation, allow clicking to bill it
     if (bed.status === 'booked_soon' && bed.current_allocation && bed.current_allocation.payment_status === 'pending') {
@@ -606,19 +651,55 @@ const POSBilling: React.FC<Props> = ({
       }
     }
     
-    // Prevent clicking on occupied beds (paid and in use)
-    if (bed.status === 'occupied') {
-      alert('This bed is currently occupied by a paid booking.');
-      return;
-    }
-    
-    // Prevent clicking on booked_soon beds with paid bookings
-    if (bed.status === 'booked_soon' && bed.current_allocation?.payment_status === 'paid') {
-      alert('This bed has an upcoming paid booking.');
-      return;
-    }
-    
     setSelectedBed(bed);
+    
+    // For occupied or booked_soon beds, inform user but allow selection for different time slots
+    if (bed.status === 'occupied') {
+      // Check if package and customer are selected first
+      if (!selectedPackageForBooking) {
+        alert('This bed is currently occupied. Please select a package first to book a different time slot.');
+        return;
+      }
+      if (!selectedCustomer) {
+        alert('This bed is currently occupied. Please select a customer first to book a different time slot.');
+        return;
+      }
+      
+      alert('This bed is currently occupied. You can create a booking for a later time slot.');
+      // Open booking modal for scheduling
+      setBookingForm({
+        customer_id: selectedCustomer?.id.toString() || '',
+        package_id: selectedPackageForBooking.id.toString(),
+        start_time: getCurrentSriLankaTimeString(),
+        date: getCurrentSriLankaDateString(),
+      });
+      setShowBookingModal(true);
+      return;
+    }
+    
+    // Allow booking on booked_soon beds for different time slots
+    if (bed.status === 'booked_soon' && bed.current_allocation?.payment_status === 'paid') {
+      // Check if package and customer are selected first
+      if (!selectedPackageForBooking) {
+        alert('This bed has an upcoming booking. Please select a package first to book a different time slot.');
+        return;
+      }
+      if (!selectedCustomer) {
+        alert('This bed has an upcoming booking. Please select a customer first to book a different time slot.');
+        return;
+      }
+      
+      alert('This bed has an upcoming booking. You can create a booking for a different time slot.');
+      // Open booking modal for scheduling
+      setBookingForm({
+        customer_id: selectedCustomer?.id.toString() || '',
+        package_id: selectedPackageForBooking.id.toString(),
+        start_time: getCurrentSriLankaTimeString(),
+        date: getCurrentSriLankaDateString(),
+      });
+      setShowBookingModal(true);
+      return;
+    }
     
     if (bed.status === 'available') {
       // Check if a package is selected first
@@ -627,10 +708,15 @@ const POSBilling: React.FC<Props> = ({
         return;
       }
       
-      // Open booking modal to create a new booking with pre-selected package
-      // Use Sri Lanka time for consistency
+      // Check if customer is selected
+      if (!selectedCustomer) {
+        alert('Please select a customer first');
+        return;
+      }
+      
+      // Open booking modal for both membership and regular customers
       setBookingForm({
-        customer_id: '',
+        customer_id: selectedCustomer?.id.toString() || '',
         package_id: selectedPackageForBooking.id.toString(),
         start_time: getCurrentSriLankaTimeString(),
         date: getCurrentSriLankaDateString(),
@@ -642,6 +728,25 @@ const POSBilling: React.FC<Props> = ({
   // Handle package selection for booking
   const handlePackageSelectForBooking = (pkg: Package) => {
     setSelectedPackageForBooking(pkg);
+    
+    // Check if selected customer has a membership for this package
+    if (selectedCustomer) {
+      const customerMembership = membershipPackages.find(mp => 
+        mp.phone === selectedCustomer.phone && 
+        mp.package.id === pkg.id && 
+        mp.status === 'active' &&
+        mp.remaining_sessions > 0
+      );
+      
+      if (customerMembership) {
+        // Auto-select the membership package for this customer
+        setSelectedMembershipPackage(customerMembership);
+      } else {
+        setSelectedMembershipPackage(null);
+      }
+    } else {
+      setSelectedMembershipPackage(null);
+    }
   };
 
   // Create booking from modal
@@ -653,11 +758,53 @@ const POSBilling: React.FC<Props> = ({
     
     setIsLoading(true);
     try {
+      let actualCustomerId = parseInt(bookingForm.customer_id);
+      
+      // If customer_id is negative, it's a membership customer - find by phone
+      if (actualCustomerId < 0) {
+        const membershipCustomer = allCustomersWithMembership.find(c => c.id === actualCustomerId);
+        if (membershipCustomer) {
+          // Find actual customer by phone number
+          const actualCustomer = customers.find(c => c.phone === membershipCustomer.phone);
+          if (actualCustomer) {
+            actualCustomerId = actualCustomer.id;
+          } else {
+            // Create new customer from membership data using quick endpoint
+            const createResponse = await axios.post('/pos/customers/quick', {
+              name: membershipCustomer.name,
+              phone: membershipCustomer.phone,
+            });
+            if (createResponse.data.success && createResponse.data.customer) {
+              actualCustomerId = createResponse.data.customer.id;
+              // Add to customers list
+              setCustomers(prev => [...prev, createResponse.data.customer]);
+            } else {
+              throw new Error('Failed to create customer');
+            }
+          }
+        }
+      }
+      
+      // Check if this is a membership booking
+      const selectedCustomerForBooking = allCustomersWithMembership.find(c => c.id === parseInt(bookingForm.customer_id));
+      const membershipPkgForBooking = selectedCustomerForBooking 
+        ? membershipPackages.find(mp => 
+            mp.phone === selectedCustomerForBooking.phone && 
+            mp.package.id === parseInt(bookingForm.package_id) && 
+            mp.status === 'active' && 
+            mp.remaining_sessions > 0
+          )
+        : null;
+      
+      // Build start_time from date and time inputs
+      const startDateTime = `${bookingForm.date} ${bookingForm.start_time}`;
+      
       const response = await axios.post('/pos/bookings', {
         bed_id: selectedBed.id,
-        customer_id: parseInt(bookingForm.customer_id),
+        customer_id: actualCustomerId,
         package_id: parseInt(bookingForm.package_id),
-        start_now: true, // Use server's current time for POS walk-in bookings
+        membership_package_id: membershipPkgForBooking?.id || null,
+        start_time: startDateTime,
       });
       
       if (response.data.success) {
@@ -665,7 +812,7 @@ const POSBilling: React.FC<Props> = ({
         setBeds(response.data.beds);
         
         // Set the selected customer
-        const customer = customers.find(c => c.id === parseInt(bookingForm.customer_id));
+        const customer = customers.find(c => c.id === actualCustomerId);
         if (customer) {
           setSelectedCustomer(customer);
         }
@@ -676,24 +823,35 @@ const POSBilling: React.FC<Props> = ({
           setSelectedBed(updatedBed);
         }
         
-        // Create invoice for this booking
+        // Create invoice for this booking (don't complete it yet)
         if (response.data.allocation) {
           const invoiceResponse = await axios.post('/pos/invoices', {
             allocation_id: response.data.allocation.id,
             invoice_type: 'booking',
-            customer_id: parseInt(bookingForm.customer_id),
+            customer_id: actualCustomerId,
           });
           
-          // Reload the invoice to get the calculated totals
           if (invoiceResponse.data.invoice) {
+            // Load the invoice but don't complete it - wait for CONFIRM BOOKING button
             const reloadedInvoice = await axios.get(`/pos/invoices/${invoiceResponse.data.invoice.id}`);
             setInvoice(reloadedInvoice.data.invoice || invoiceResponse.data.invoice);
           }
         }
         
         setShowBookingModal(false);
-        setSelectedPackageForBooking(null); // Clear selected package
-        alert('Booking created successfully!');
+        
+        // Auto-select the package for membership customers
+        const pkg = packages.find(p => p.id === parseInt(bookingForm.package_id));
+        if (pkg && membershipPkgForBooking) {
+          handlePackageSelectForBooking(pkg);
+        } else {
+          setSelectedPackageForBooking(null);
+        }
+        
+        alert(membershipPkgForBooking 
+          ? 'Booking created! Click "CONFIRM BOOKING" to confirm.' 
+          : 'Booking created successfully!'
+        );
       }
     } catch (error: any) {
       alert(error.response?.data?.message || 'Failed to create booking');
@@ -817,13 +975,48 @@ const POSBilling: React.FC<Props> = ({
     return new Intl.NumberFormat('en-LK', { style: 'decimal', minimumFractionDigits: 2 }).format(amount) + ' LKR';
   };
 
-  // Filter customers by search
+  // Filter customers by search (including membership customers)
   const filteredCustomers = customerSearchQuery 
-    ? customers.filter(c => 
-        c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-        c.phone.includes(customerSearchQuery)
-      )
+    ? (() => {
+        // Search in regular customers
+        const matchedCustomers = customers.filter(c => 
+          c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+          c.phone.includes(customerSearchQuery)
+        );
+        
+        // Search in membership packages for customers not already in the list
+        const membershipCustomers = membershipPackages
+          .filter(mp => 
+            mp.status === 'active' &&
+            (mp.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+             mp.phone.includes(customerSearchQuery))
+          )
+          .map(mp => ({
+            id: mp.id * -1, // Use negative ID to distinguish membership customers
+            name: mp.name,
+            phone: mp.phone,
+            isMember: true
+          }))
+          .filter(mc => !matchedCustomers.some(c => c.phone === mc.phone)); // Avoid duplicates
+        
+        return [...matchedCustomers, ...membershipCustomers];
+      })()
     : customers;
+
+  // Combined list of all customers including membership customers (for dropdowns)
+  const allCustomersWithMembership = (() => {
+    const membershipOnlyCustomers = membershipPackages
+      .filter(mp => mp.status === 'active')
+      .map(mp => ({
+        id: mp.id * -1, // Use negative ID to distinguish
+        name: mp.name,
+        phone: mp.phone,
+        isMember: true
+      }))
+      .filter(mc => !customers.some(c => c.phone === mc.phone)); // Avoid duplicates
+    
+    return [...customers, ...membershipOnlyCustomers];
+  })();
 
   return (
     <HeaderLayout>
@@ -1011,43 +1204,91 @@ const POSBilling: React.FC<Props> = ({
 
                 <div className="p-4">
                   <div className="grid grid-cols-3 gap-4">
-                    {packages.map((pkg) => (
-                      <button
-                        key={pkg.id}
-                        onClick={() => handlePackageSelectForBooking(pkg)}
-                        className={`p-4 border-2 rounded-xl text-left transition-all group ${
-                          selectedPackageForBooking?.id === pkg.id
-                            ? 'border-teal-500 bg-teal-50'
-                            : 'border-yellow-200 hover:border-yellow-400 hover:bg-yellow-50'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h3 className={`font-semibold ${
-                              selectedPackageForBooking?.id === pkg.id
-                                ? 'text-teal-700'
-                                : 'text-gray-900 group-hover:text-yellow-700'
-                            }`}>{pkg.name}</h3>
-                            <p className="text-sm text-gray-500 flex items-center mt-1">
-                              <ClockIcon className="w-4 h-4 mr-1" />
-                              {pkg.duration_minutes} min
-                            </p>
+                    {packages.map((pkg) => {
+                      // Check if this package is included in any of the customer's membership packages
+                      const isInMembership = selectedCustomer && membershipPackages.some(membershipPkg => 
+                        membershipPkg.phone === selectedCustomer.phone && 
+                        membershipPkg.package.id === pkg.id && 
+                        membershipPkg.status === 'active' &&
+                        membershipPkg.remaining_sessions > 0
+                      );
+                      
+                      return (
+                        <button
+                          key={pkg.id}
+                          onClick={() => handlePackageSelectForBooking(pkg)}
+                          className={`p-4 border-2 rounded-xl text-left transition-all group relative ${
+                            selectedPackageForBooking?.id === pkg.id
+                              ? 'border-teal-500 bg-teal-50'
+                              : isInMembership
+                                ? 'border-purple-300 bg-purple-50 hover:border-purple-500'
+                                : 'border-yellow-200 hover:border-yellow-400 hover:bg-yellow-50'
+                          }`}
+                        >
+                          {/* Membership badge */}
+                          {isInMembership && (
+                            <div className="absolute -top-2 -right-2 bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-bold">
+                              💎 MEMBER
+                            </div>
+                          )}
+                          
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h3 className={`font-semibold ${
+                                selectedPackageForBooking?.id === pkg.id
+                                  ? 'text-teal-700'
+                                  : isInMembership
+                                    ? 'text-purple-700 group-hover:text-purple-800'
+                                    : 'text-gray-900 group-hover:text-yellow-700'
+                              }`}>{pkg.name}</h3>
+                              <p className="text-sm text-gray-500 flex items-center mt-1">
+                                <ClockIcon className="w-4 h-4 mr-1" />
+                                {pkg.duration_minutes} min
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                        <div className={`mt-3 text-lg font-bold ${
-                          selectedPackageForBooking?.id === pkg.id
-                            ? 'text-teal-600'
-                            : 'text-yellow-600'
-                        }`}>
-                          {formatCurrency(pkg.price)}
-                        </div>
-                        {selectedPackageForBooking?.id === pkg.id && (
-                          <div className="mt-2 text-xs text-teal-600 font-medium">
-                            ✓ Selected - Click a bed to assign
+                          <div className={`mt-3 text-lg font-bold ${
+                            selectedPackageForBooking?.id === pkg.id
+                              ? 'text-teal-600'
+                              : isInMembership
+                                ? 'text-purple-600'
+                                : 'text-yellow-600'
+                          }`}>
+                            {isInMembership ? (
+                              (() => {
+                                const membershipPkg = membershipPackages.find(mp => 
+                                  mp.phone === selectedCustomer?.phone && 
+                                  mp.package.id === pkg.id && 
+                                  mp.status === 'active'
+                                );
+                                return membershipPkg?.remaining_balance > 0 ? 'PARTIAL PAID' : 'FREE SESSION';
+                              })()
+                            ) : formatCurrency(pkg.price)}
                           </div>
-                        )}
-                      </button>
-                    ))}
+                          {isInMembership && (
+                            (() => {
+                              const membershipPkg = membershipPackages.find(mp => 
+                                mp.phone === selectedCustomer?.phone && 
+                                mp.package.id === pkg.id && 
+                                mp.status === 'active'
+                              );
+                              return (
+                                <div className="mt-2 text-xs text-purple-600 font-medium">
+                                  💎 {membershipPkg?.remaining_balance > 0 
+                                    ? `Available in membership (Balance: ${formatCurrency(membershipPkg.remaining_balance)})` 
+                                    : 'Available in membership (Fully Paid)'}
+                                </div>
+                              );
+                            })()
+                          )}
+                          {selectedPackageForBooking?.id === pkg.id && (
+                            <div className="mt-2 text-xs text-teal-600 font-medium">
+                              ✓ Selected - Click a bed to assign
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                   {packages.length === 0 && (
                     <div className="py-12 text-center text-gray-500">
@@ -1070,24 +1311,57 @@ const POSBilling: React.FC<Props> = ({
                 <div className="p-4">
                   {selectedCustomer ? (
                     (() => {
-                      const customerPackages = membershipPackages.filter(pkg => 
-                        pkg.phone === selectedCustomer.phone && pkg.status === 'active' && pkg.remaining_sessions > 0
-                      );
+                      const customerPackages = membershipPackages.filter(pkg => {                        
+                        return pkg.phone === selectedCustomer.phone && 
+                               pkg.status === 'active' && 
+                               pkg.remaining_sessions > 0;
+                      });
+                      
+                      const totalBalance = customerPackages.reduce((sum, pkg) => sum + pkg.remaining_balance, 0);
+                      const totalPaid = customerPackages.reduce((sum, pkg) => sum + (pkg.full_payment - pkg.remaining_balance), 0);
                       
                       return customerPackages.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          {/* Payment Summary */}
+                          {customerPackages.length > 0 && (
+                            <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="text-center">
+                                  <div className="text-green-600 font-bold text-lg">
+                                    {formatCurrency(totalPaid)}
+                                  </div>
+                                  <div className="text-gray-600">Total Paid</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className={`font-bold text-lg ${totalBalance > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                                    {formatCurrency(totalBalance)}
+                                  </div>
+                                  <div className="text-gray-600">Remaining Balance</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="grid grid-cols-2 gap-4">
                           {customerPackages.map((membershipPkg) => (
                             <button
                               key={membershipPkg.id}
                               onClick={() => {
-                                // Create a customer booking with this membership package
-                                if (selectedBed && selectedBed.status === 'available') {
-                                  alert('Feature coming soon: Direct membership package booking from POS');
-                                } else {
-                                  alert('Please select an available bed first');
+                                // Auto-select the corresponding regular package
+                                const correspondingPackage = packages.find(pkg => pkg.id === membershipPkg.package.id);
+                                if (correspondingPackage) {
+                                  setSelectedPackageForBooking(correspondingPackage);
+                                  setSelectedMembershipPackage(membershipPkg);
                                 }
+                                
+                                // Provide user feedback
+                                alert(`Membership package "${membershipPkg.package.name}" selected! Now click on an available bed to create a FREE booking.`);
                               }}
-                              className="p-4 border-2 border-purple-200 hover:border-purple-400 hover:bg-purple-50 rounded-xl text-left transition-all group"
+                              className={`p-4 border-2 rounded-xl text-left transition-all group ${
+                                selectedMembershipPackage?.id === membershipPkg.id
+                                  ? 'border-purple-500 bg-purple-100 ring-2 ring-purple-300'
+                                  : 'border-purple-200 hover:border-purple-400 hover:bg-purple-50'
+                              }`}
                             >
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
@@ -1101,6 +1375,29 @@ const POSBilling: React.FC<Props> = ({
                                     <ClockIcon className="w-3 h-3 mr-1" />
                                     {membershipPkg.package.duration_minutes} min
                                   </p>
+                                  {/* Payment Status */}
+                                  <div className="mt-2 text-xs">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-gray-500">Package Price:</span>
+                                      <span className="font-medium text-gray-700">
+                                        {formatCurrency(membershipPkg.full_payment)}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-green-600">Paid:</span>
+                                      <span className="font-medium text-green-600">
+                                        {formatCurrency(membershipPkg.full_payment - membershipPkg.remaining_balance)}
+                                      </span>
+                                    </div>
+                                    {membershipPkg.remaining_balance > 0 && (
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-orange-600">Balance:</span>
+                                        <span className="font-medium text-orange-600">
+                                          {formatCurrency(membershipPkg.remaining_balance)}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                               <div className="mt-3 flex items-center justify-between">
@@ -1113,16 +1410,28 @@ const POSBilling: React.FC<Props> = ({
                                   </span>
                                 </div>
                                 <div className="text-right">
-                                  <div className="text-lg font-bold text-purple-600">
-                                    FREE
+                                  <div className="text-lg font-bold text-green-600">
+                                    FREE SESSION
                                   </div>
                                   <div className="text-xs text-gray-500">
-                                    Pre-paid
+                                    {membershipPkg.remaining_balance > 0 ? 'Partial Payment' : 'Fully Paid'}
                                   </div>
+                                  {membershipPkg.remaining_balance > 0 && (
+                                    <div className="text-xs text-orange-600 font-medium mt-1">
+                                      Balance: {formatCurrency(membershipPkg.remaining_balance)}
+                                    </div>
+                                  )}
                                 </div>
+                                {/* Selection indicator */}
+                                {selectedMembershipPackage?.id === membershipPkg.id && (
+                                  <div className="mt-2 text-xs text-purple-600 font-bold">
+                                    ✓ SELECTED - Click a bed to create FREE booking
+                                  </div>
+                                )}
                               </div>
                             </button>
                           ))}
+                          </div>
                         </div>
                       ) : (
                         <div className="py-8 text-center text-gray-400">
@@ -1217,7 +1526,12 @@ const POSBilling: React.FC<Props> = ({
                                 setCustomerSearchQuery('');
                               }}
                             >
-                              <span className="font-medium text-gray-900">{customer.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-900">{customer.name}</span>
+                                {'isMember' in customer && customer.isMember && (
+                                  <Badge className="bg-purple-100 text-purple-700 text-xs">MEMBER</Badge>
+                                )}
+                              </div>
                               <span className="text-sm text-gray-600">{customer.phone}</span>
                             </button>
                           ))}
@@ -1265,392 +1579,496 @@ const POSBilling: React.FC<Props> = ({
 
                 {/* Billing Summary */}
                 <div className="p-4 border-t border-gray-200 bg-gray-50">
-                  <div className="space-y-3">
-                    {/* Subtotal */}
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-900 font-medium">Subtotal</span>
-                      <span className="font-semibold text-gray-900">{formatCurrency(invoice?.subtotal || 0)}</span>
-                    </div>
-
-                    {/* Discount */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-900 font-medium w-24">Discount</span>
-                      <div className="flex-1 flex items-center gap-1">
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          value={discountPercent || ''}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value) || 0;
-                            if (val >= 0 && val <= 100) {
-                              setDiscountPercent(val);
-                            }
-                          }}
-                          onBlur={handleUpdateInvoice}
-                          placeholder="0"
-                          className="h-8 text-sm text-gray-900"
-                        />
-                        <span className="text-sm text-gray-600 whitespace-nowrap">%</span>
+                  {/* Membership Package Info - Show if membership selected WITHOUT payment fields */}
+                  {selectedMembershipPackage ? (
+                    <div className="text-center p-6 bg-purple-50 border-2 border-purple-300 rounded-lg">
+                      <div className="text-4xl mb-3">💎</div>
+                      <h3 className="font-bold text-purple-800 text-xl mb-2">Membership Package</h3>
+                      <p className="text-purple-700 font-semibold text-lg mb-2">{selectedMembershipPackage.package.name}</p>
+                      <p className="text-sm text-gray-600 mb-3">
+                        {selectedMembershipPackage.remaining_sessions} sessions remaining
+                      </p>
+                      <div className="bg-green-100 border border-green-300 rounded-lg py-3 px-4 mb-3">
+                        <p className="text-2xl font-bold text-green-700">FREE SESSION</p>
+                        <p className="text-xs text-gray-600 mt-1">Pre-paid membership - No payment required</p>
                       </div>
-                      <span className="text-sm font-semibold w-24 text-right text-gray-900">
-                        -{formatCurrency(invoice?.discount_amount || 0)}
-                      </span>
-                    </div>
-
-                    {/* Service Charge */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-900 font-medium w-24">Service</span>
-                      <Select 
-                        value={serviceChargePercent.toString()} 
-                        onValueChange={(val) => {
-                          setServiceChargePercent(parseInt(val));
-                          setTimeout(handleUpdateInvoice, 100);
-                        }}
-                      >
-                        <SelectTrigger className="flex-1 h-8">
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">No Charge</SelectItem>
-                          <SelectItem value="5">5%</SelectItem>
-                          <SelectItem value="10">10%</SelectItem>
-                          <SelectItem value="15">15%</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <span className="text-sm font-semibold w-24 text-right text-gray-900">
-                        +{formatCurrency(invoice?.service_charge || 0)}
-                      </span>
-                    </div>
-
-                    {/* Tax */}
-                    {(invoice?.tax_amount || 0) > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Tax</span>
-                        <span className="font-medium">+{formatCurrency(invoice?.tax_amount || 0)}</span>
-                      </div>
-                    )}
-
-                    {/* Total */}
-                    <div className="flex justify-between pt-3 border-t border-gray-300">
-                      <span className="text-lg font-bold text-gray-900">Total</span>
-                      <span className="text-lg font-bold text-teal-600">{formatCurrency(invoice?.total_amount || 0)}</span>
-                    </div>
-
-                    {/* Advance Payment Display - Show if booking has advance payment */}
-                    {invoice && invoice.allocation && loadedBooking && loadedBooking.advance_paid && loadedBooking.advance_paid > 0 && (
-                      <div className="pt-3 border-t border-dashed border-blue-300 bg-blue-50 -mx-4 px-4 py-3 rounded-lg">
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-blue-700 font-medium">📌 Original Package Price</span>
-                            <span className="font-semibold text-blue-900">{formatCurrency(loadedBooking.total_amount || 0)}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-green-600 font-medium">✓ Advance Paid</span>
-                            <span className="font-semibold text-green-600">-{formatCurrency(loadedBooking.advance_paid)}</span>
-                          </div>
-                          <div className="flex justify-between pt-2 border-t border-blue-200">
-                            <span className="font-bold text-blue-900">Balance to Pay</span>
-                            <span className="font-bold text-orange-600">{formatCurrency(loadedBooking.balance_amount || 0)}</span>
-                          </div>
+                      
+                      {/* Customer Info */}
+                      {selectedCustomer && (
+                        <div className="mt-4 p-3 bg-white rounded-lg text-left">
+                          <p className="text-sm text-gray-600">Customer</p>
+                          <p className="font-semibold text-gray-900">{selectedCustomer.name}</p>
+                          <p className="text-sm text-gray-600">{selectedCustomer.phone}</p>
                         </div>
-                      </div>
-                    )}
-
-                    {/* Paid & Balance with Payment Breakdown */}
-                    {invoice && invoice.paid_amount > 0 && (
-                      <>
-                        {/* Payment Breakdown by Method */}
-                        {invoice.payments && invoice.payments.length > 0 && (
-                          <div className="pt-2 space-y-1">
-                            {invoice.payments.filter(p => p.payment_method === 'cash').length > 0 && (
-                              <div className="flex justify-between text-sm">
-                                <span className="text-green-600 flex items-center gap-1">
-                                  <span>💵</span> Cash
-                                </span>
-                                <span className="font-medium text-green-600">
-                                  {formatCurrency(
-                                    invoice.payments
-                                      .filter(p => p.payment_method === 'cash')
-                                      .reduce((sum, p) => sum + p.amount, 0)
-                                  )}
-                                </span>
-                              </div>
-                            )}
-                            {invoice.payments.filter(p => p.payment_method === 'card').length > 0 && (
-                              <div className="flex justify-between text-sm">
-                                <span className="text-green-600 flex items-center gap-1">
-                                  <span>💳</span> Card
-                                </span>
-                                <span className="font-medium text-green-600">
-                                  {formatCurrency(
-                                    invoice.payments
-                                      .filter(p => p.payment_method === 'card')
-                                      .reduce((sum, p) => sum + p.amount, 0)
-                                  )}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <div className="flex justify-between text-sm pt-1 border-t border-dashed border-gray-300">
-                          <span className="text-green-600 font-medium">Total Paid</span>
-                          <span className="font-medium text-green-600">{formatCurrency(invoice.paid_amount)}</span>
+                      )}
+                      
+                      {/* Selected Bed Info */}
+                      {selectedBed && (
+                        <div className="mt-3 p-3 bg-white rounded-lg text-left">
+                          <p className="text-sm text-gray-600">Bed</p>
+                          <p className="font-semibold text-gray-900">Bed {selectedBed.bed_number}</p>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="font-semibold text-gray-900">Balance</span>
-                          <span className={`font-bold ${invoice.balance_amount > 0 ? 'text-red-500' : 'text-green-500'}`}>
-                            {formatCurrency(invoice.balance_amount)}
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {/* Regular Payment Flow - Show only for non-membership customers */}
+                      <div className="space-y-3">
+                        {/* Subtotal */}
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-900 font-medium">Subtotal</span>
+                          <span className="font-semibold text-gray-900">{formatCurrency(invoice?.subtotal || 0)}</span>
+                        </div>
+
+                        {/* Discount */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-900 font-medium w-24">Discount</span>
+                          <div className="flex-1 flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={discountPercent || ''}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                if (val >= 0 && val <= 100) {
+                                  setDiscountPercent(val);
+                                }
+                              }}
+                              onBlur={handleUpdateInvoice}
+                              placeholder="0"
+                              className="h-8 text-sm text-gray-900"
+                            />
+                            <span className="text-sm text-gray-600 whitespace-nowrap">%</span>
+                          </div>
+                          <span className="text-sm font-semibold w-24 text-right text-gray-900">
+                            -{formatCurrency(invoice?.discount_amount || 0)}
                           </span>
                         </div>
-                      </>
-                    )}
-                  </div>
 
-                  {/* Kitchen Note */}
-                  <div className="mt-4">
-                    <Input
-                      placeholder="Add a note..."
-                      value={kitchenNote}
-                      onChange={(e) => setKitchenNote(e.target.value)}
-                      onBlur={handleUpdateInvoice}
-                      className="text-sm text-gray-900"
-                    />
-                  </div>
-
-                  {/* Payment Method Selection */}
-                  <div className="mt-4">
-                    <span className="text-sm text-gray-900 font-medium mb-2 block">Payment Method :</span>
-                    <div className="flex justify-center gap-3">
-                      {/* Cash Option */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaymentType('cash');
-                          setReceivedAmount(0);
-                        }}
-                        className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all w-20 ${paymentType === 'cash' ? 'border-yellow-500 bg-yellow-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
-                      >
-                        <div className={`w-14 h-14 rounded-lg flex items-center justify-center ${paymentType === 'cash' ? 'bg-yellow-400' : 'bg-gray-100'}`}>
-                          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='8' y='20' width='48' height='28' rx='2' fill='%2322c55e'/%3E%3Crect x='12' y='24' width='40' height='20' rx='1' fill='%234ade80'/%3E%3Ccircle cx='32' cy='34' r='8' fill='%2322c55e'/%3E%3Ctext x='32' y='38' text-anchor='middle' fill='white' font-size='10' font-weight='bold'%3E$%3C/text%3E%3Crect x='4' y='16' width='48' height='28' rx='2' fill='%2316a34a'/%3E%3Crect x='8' y='20' width='40' height='20' rx='1' fill='%2322c55e'/%3E%3Ccircle cx='28' cy='30' r='8' fill='%2316a34a'/%3E%3Ctext x='28' y='34' text-anchor='middle' fill='white' font-size='10' font-weight='bold'%3E$%3C/text%3E%3C/svg%3E" alt="Cash" className="w-10 h-10" />
+                        {/* Service Charge */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-900 font-medium w-24">Service</span>
+                          <Select 
+                            value={serviceChargePercent.toString()} 
+                            onValueChange={(val) => {
+                              setServiceChargePercent(parseInt(val));
+                              setTimeout(handleUpdateInvoice, 100);
+                            }}
+                          >
+                            <SelectTrigger className="flex-1 h-8">
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">No Charge</SelectItem>
+                              <SelectItem value="5">5%</SelectItem>
+                              <SelectItem value="10">10%</SelectItem>
+                              <SelectItem value="15">15%</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <span className="text-sm font-semibold w-24 text-right text-gray-900">
+                            +{formatCurrency(invoice?.service_charge || 0)}
+                          </span>
                         </div>
-                        <span className={`mt-1 text-xs font-medium ${paymentType === 'cash' ? 'text-yellow-700' : 'text-gray-600'}`}>Cash</span>
-                      </button>
 
-                      {/* Card Option */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaymentType('card');
-                          setReceivedAmount(invoice?.balance_amount || 0);
-                        }}
-                        className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all w-20 ${paymentType === 'card' ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
-                      >
-                        <div className={`w-14 h-14 rounded-lg flex items-center justify-center ${paymentType === 'card' ? 'bg-red-400' : 'bg-gray-100'}`}>
-                          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='14' width='52' height='36' rx='4' fill='%23ef4444'/%3E%3Crect x='6' y='22' width='52' height='10' fill='%23991b1b'/%3E%3Crect x='12' y='38' width='20' height='4' rx='1' fill='%23fbbf24'/%3E%3Crect x='44' y='16' width='10' height='8' rx='1' fill='%23fbbf24'/%3E%3C/svg%3E" alt="Card" className="w-10 h-10" />
+                        {/* Tax */}
+                        {(invoice?.tax_amount || 0) > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Tax</span>
+                            <span className="font-medium">+{formatCurrency(invoice?.tax_amount || 0)}</span>
+                          </div>
+                        )}
+
+                        {/* Total */}
+                        <div className="flex justify-between pt-3 border-t border-gray-300">
+                          <span className="text-lg font-bold text-gray-900">Total</span>
+                          <span className="text-lg font-bold text-teal-600">{formatCurrency(invoice?.total_amount || 0)}</span>
                         </div>
-                        <span className={`mt-1 text-xs font-medium ${paymentType === 'card' ? 'text-red-700' : 'text-gray-600'}`}>Card</span>
-                      </button>
+                      </div>
 
-                      {/* Split/Partial Option */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaymentType('partial');
-                          setCashAmount(0);
-                          setCardAmount(0);
-                        }}
-                        className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all w-20 ${paymentType === 'partial' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
-                      >
-                        <div className={`w-14 h-14 rounded-lg flex items-center justify-center ${paymentType === 'partial' ? 'bg-blue-400' : 'bg-gray-100'}`}>
-                          <span className="text-2xl">🔀</span>
+                      {/* Advance Payment Display - Show if booking has advance payment */}
+                      {invoice && invoice.allocation && loadedBooking && loadedBooking.advance_paid && loadedBooking.advance_paid > 0 && (
+                        <div className="pt-3 border-t border-dashed border-blue-300 bg-blue-50 -mx-4 px-4 py-3 rounded-lg">
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-blue-700 font-medium">📌 Original Package Price</span>
+                              <span className="font-semibold text-blue-900">{formatCurrency(loadedBooking.total_amount || 0)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-green-600 font-medium">✓ Advance Paid</span>
+                              <span className="font-semibold text-green-600">-{formatCurrency(loadedBooking.advance_paid)}</span>
+                            </div>
+                            <div className="flex justify-between pt-2 border-t border-blue-200">
+                              <span className="font-bold text-blue-900">Balance to Pay</span>
+                              <span className="font-bold text-orange-600">{formatCurrency(loadedBooking.balance_amount || 0)}</span>
+                            </div>
+                          </div>
                         </div>
-                        <span className={`mt-1 text-xs font-medium ${paymentType === 'partial' ? 'text-blue-700' : 'text-gray-600'}`}>Split</span>
-                      </button>
-                    </div>
-                  </div>
+                      )}
 
-                  {/* Payment Amount Input - Only show if invoice exists and has balance */}
-                  {invoice && invoice.balance_amount > 0 && (
-                    <div className="mt-4 p-4 bg-white border border-gray-200 rounded-lg space-y-3">
-                      {paymentType === 'partial' ? (
+                      {/* Paid & Balance with Payment Breakdown */}
+                      {invoice && invoice.paid_amount > 0 && (
                         <>
-                          {/* Split Payment Inputs */}
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xl">💵</span>
-                              <div className="flex-1">
-                                <Label className="text-xs text-gray-600">Cash Amount</Label>
-                                <Input
-                                  type="number"
-                                  value={cashAmount || ''}
-                                  onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
-                                  placeholder="0.00"
-                                  className="text-gray-900"
-                                />
+                          {/* Payment Breakdown by Method */}
+                          {invoice.payments && invoice.payments.length > 0 && (
+                            <div className="pt-2 space-y-1">
+                              {invoice.payments.filter(p => p.payment_method === 'cash').length > 0 && (
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-green-600 flex items-center gap-1">
+                                    <span>💵</span> Cash
+                                  </span>
+                                  <span className="font-medium text-green-600">
+                                    {formatCurrency(
+                                      invoice.payments
+                                        .filter(p => p.payment_method === 'cash')
+                                        .reduce((sum, p) => sum + p.amount, 0)
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                              {invoice.payments.filter(p => p.payment_method === 'card').length > 0 && (
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-green-600 flex items-center gap-1">
+                                    <span>💳</span> Card
+                                  </span>
+                                  <span className="font-medium text-green-600">
+                                    {formatCurrency(
+                                      invoice.payments
+                                        .filter(p => p.payment_method === 'card')
+                                        .reduce((sum, p) => sum + p.amount, 0)
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm pt-1 border-t border-dashed border-gray-300">
+                            <span className="text-green-600 font-medium">Total Paid</span>
+                            <span className="font-medium text-green-600">{formatCurrency(invoice.paid_amount)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-semibold text-gray-900">Balance</span>
+                            <span className={`font-bold ${invoice.balance_amount > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                              {formatCurrency(invoice.balance_amount)}
+                            </span>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Kitchen Note */}
+                      <div className="mt-4">
+                        <Input
+                          placeholder="Add a note..."
+                          value={kitchenNote}
+                          onChange={(e) => setKitchenNote(e.target.value)}
+                          onBlur={handleUpdateInvoice}
+                          className="text-sm text-gray-900"
+                        />
+                      </div>
+
+                      {/* Payment Method Selection */}
+                      <div className="mt-4">
+                      <span className="text-sm text-gray-900 font-medium mb-2 block">Payment Method :</span>
+                      <div className="flex justify-center gap-3">
+                        {/* Cash Option */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPaymentType('cash');
+                            setReceivedAmount(0);
+                          }}
+                          className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all w-20 ${paymentType === 'cash' ? 'border-yellow-500 bg-yellow-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+                        >
+                          <div className={`w-14 h-14 rounded-lg flex items-center justify-center ${paymentType === 'cash' ? 'bg-yellow-400' : 'bg-gray-100'}`}>
+                            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='8' y='20' width='48' height='28' rx='2' fill='%2322c55e'/%3E%3Crect x='12' y='24' width='40' height='20' rx='1' fill='%234ade80'/%3E%3Ccircle cx='32' cy='34' r='8' fill='%2322c55e'/%3E%3Ctext x='32' y='38' text-anchor='middle' fill='white' font-size='10' font-weight='bold'%3E$%3C/text%3E%3Crect x='4' y='16' width='48' height='28' rx='2' fill='%2316a34a'/%3E%3Crect x='8' y='20' width='40' height='20' rx='1' fill='%2322c55e'/%3E%3Ccircle cx='28' cy='30' r='8' fill='%2316a34a'/%3E%3Ctext x='28' y='34' text-anchor='middle' fill='white' font-size='10' font-weight='bold'%3E$%3C/text%3E%3C/svg%3E" alt="Cash" className="w-10 h-10" />
+                          </div>
+                          <span className={`mt-1 text-xs font-medium ${paymentType === 'cash' ? 'text-yellow-700' : 'text-gray-600'}`}>Cash</span>
+                        </button>
+
+                        {/* Card Option */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPaymentType('card');
+                            setReceivedAmount(invoice?.balance_amount || 0);
+                          }}
+                          className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all w-20 ${paymentType === 'card' ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+                        >
+                          <div className={`w-14 h-14 rounded-lg flex items-center justify-center ${paymentType === 'card' ? 'bg-red-400' : 'bg-gray-100'}`}>
+                            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='14' width='52' height='36' rx='4' fill='%23ef4444'/%3E%3Crect x='6' y='22' width='52' height='10' fill='%23991b1b'/%3E%3Crect x='12' y='38' width='20' height='4' rx='1' fill='%23fbbf24'/%3E%3Crect x='44' y='16' width='10' height='8' rx='1' fill='%23fbbf24'/%3E%3C/svg%3E" alt="Card" className="w-10 h-10" />
+                          </div>
+                          <span className={`mt-1 text-xs font-medium ${paymentType === 'card' ? 'text-red-700' : 'text-gray-600'}`}>Card</span>
+                        </button>
+
+                        {/* Split/Partial Option */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPaymentType('partial');
+                            setCashAmount(0);
+                            setCardAmount(0);
+                          }}
+                          className={`flex flex-col items-center p-3 rounded-lg border-2 transition-all w-20 ${paymentType === 'partial' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
+                        >
+                          <div className={`w-14 h-14 rounded-lg flex items-center justify-center ${paymentType === 'partial' ? 'bg-blue-400' : 'bg-gray-100'}`}>
+                            <span className="text-2xl">🔀</span>
+                          </div>
+                          <span className={`mt-1 text-xs font-medium ${paymentType === 'partial' ? 'text-blue-700' : 'text-gray-600'}`}>Split</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Payment Amount Input - Only show if invoice exists and has balance */}
+                    {invoice && invoice.balance_amount > 0 && (
+                      <div className="mt-4 p-4 bg-white border border-gray-200 rounded-lg space-y-3">
+                        {paymentType === 'partial' ? (
+                          <>
+                            {/* Split Payment Inputs */}
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xl">💵</span>
+                                <div className="flex-1">
+                                  <Label className="text-xs text-gray-600">Cash Amount</Label>
+                                  <Input
+                                    type="number"
+                                    value={cashAmount || ''}
+                                    onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
+                                    placeholder="0.00"
+                                    className="text-gray-900"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xl">💳</span>
+                                <div className="flex-1">
+                                  <Label className="text-xs text-gray-600">Card Amount</Label>
+                                  <Input
+                                    type="number"
+                                    value={cardAmount || ''}
+                                    onChange={(e) => setCardAmount(parseFloat(e.target.value) || 0)}
+                                    placeholder="0.00"
+                                    className="text-gray-900"
+                                  />
+                                </div>
+                              </div>
+                              {cardAmount > 0 && (
+                                <div>
+                                  <Label className="text-xs text-gray-600">Card Reference</Label>
+                                  <Input
+                                    value={cardReference}
+                                    onChange={(e) => setCardReference(e.target.value)}
+                                    placeholder="Transaction ID"
+                                    className="text-gray-900"
+                                  />
+                                </div>
+                              )}
+                              {/* Split Total */}
+                              <div className="pt-2 border-t border-gray-200">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600">Split Total:</span>
+                                  <span className={`font-semibold ${(cashAmount + cardAmount) >= invoice.balance_amount ? 'text-green-600' : 'text-red-600'}`}>
+                                    {formatCurrency(cashAmount + cardAmount)}
+                                  </span>
+                                </div>
+                                {(cashAmount + cardAmount) < invoice.balance_amount && (
+                                  <p className="text-xs text-red-500 mt-1">
+                                    Remaining: {formatCurrency(invoice.balance_amount - (cashAmount + cardAmount))}
+                                  </p>
+                                )}
+                                {(cashAmount + cardAmount) > invoice.balance_amount && (
+                                  <p className="text-xs text-green-500 mt-1">
+                                    Change: {formatCurrency((cashAmount + cardAmount) - invoice.balance_amount)}
+                                  </p>
+                                )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xl">💳</span>
-                              <div className="flex-1">
-                                <Label className="text-xs text-gray-600">Card Amount</Label>
-                                <Input
-                                  type="number"
-                                  value={cardAmount || ''}
-                                  onChange={(e) => setCardAmount(parseFloat(e.target.value) || 0)}
-                                  placeholder="0.00"
-                                  className="text-gray-900"
-                                />
-                              </div>
+                          </>
+                        ) : (
+                          <>
+                            {/* Single Payment Input */}
+                            <div>
+                              <Label className="text-sm text-gray-900 font-medium">
+                                {paymentType === 'cash' ? '💵 Cash Received' : '💳 Card Amount'}
+                              </Label>
+                              <Input
+                                type="number"
+                                value={receivedAmount || ''}
+                                onChange={(e) => setReceivedAmount(parseFloat(e.target.value) || 0)}
+                                placeholder="Enter amount..."
+                                className="mt-1 text-lg font-semibold text-gray-900"
+                              />
                             </div>
-                            {cardAmount > 0 && (
+                            
+                            {paymentType === 'card' && (
                               <div>
-                                <Label className="text-xs text-gray-600">Card Reference</Label>
+                                <Label className="text-xs text-gray-600">Card Reference / Transaction ID</Label>
                                 <Input
                                   value={cardReference}
                                   onChange={(e) => setCardReference(e.target.value)}
-                                  placeholder="Transaction ID"
+                                  placeholder="Enter reference number"
                                   className="text-gray-900"
                                 />
                               </div>
                             )}
-                            {/* Split Total */}
-                            <div className="pt-2 border-t border-gray-200">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Split Total:</span>
-                                <span className={`font-semibold ${(cashAmount + cardAmount) >= invoice.balance_amount ? 'text-green-600' : 'text-red-600'}`}>
-                                  {formatCurrency(cashAmount + cardAmount)}
-                                </span>
+                            
+                            {/* Balance/Change Display */}
+                            {receivedAmount > 0 && (
+                              <div className="pt-2 border-t border-gray-200">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm text-gray-600">
+                                    {calculateBalance() >= 0 ? 'Change to Return:' : 'Remaining Balance:'}
+                                  </span>
+                                  <span className={`text-lg font-bold ${calculateBalance() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {formatCurrency(Math.abs(calculateBalance()))}
+                                  </span>
+                                </div>
                               </div>
-                              {(cashAmount + cardAmount) < invoice.balance_amount && (
-                                <p className="text-xs text-red-500 mt-1">
-                                  Remaining: {formatCurrency(invoice.balance_amount - (cashAmount + cardAmount))}
-                                </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                    </>
+                  )}
+
+                    {/* Action Buttons */}
+                    <div className="mt-4 space-y-2">
+                      {selectedMembershipPackage ? (
+                        <>
+                          {/* Membership Customer - Confirm Booking Button */}
+                          {(!invoice || invoice.payment_status !== 'paid') && selectedBed && (
+                            <Button
+                              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 text-base font-semibold"
+                              disabled={!selectedBed || !selectedCustomer || !selectedMembershipPackage || !invoice || isLoading}
+                              onClick={async () => {
+                                if (!invoice || !selectedCustomer || !selectedMembershipPackage) return;
+                                
+                                setIsLoading(true);
+                                try {
+                                  // Complete the existing invoice (session will be deducted)
+                                  const completeResponse = await axios.post(`/pos/invoices/${invoice.id}/complete`, {});
+                                  
+                                  if (completeResponse.data.success) {
+                                    setInvoice(completeResponse.data.invoice);
+                                    // Update beds if returned
+                                    if (completeResponse.data.beds) {
+                                      setBeds(completeResponse.data.beds);
+                                      if (selectedBed) {
+                                        const updBed = completeResponse.data.beds.find((b: Bed) => b.id === selectedBed.id);
+                                        if (updBed) setSelectedBed(updBed);
+                                      }
+                                    }
+                                    alert('Membership booking confirmed! Session deducted.');
+                                  }
+                                } catch (error: any) {
+                                  alert(error.response?.data?.message || 'Failed to confirm booking');
+                                } finally {
+                                  setIsLoading(false);
+                                }
+                              }}
+                            >
+                              {isLoading ? (
+                                'Processing...'
+                              ) : (
+                                <>
+                                  <CheckCircleIcon className="w-5 h-5 mr-2" />
+                                  CONFIRM BOOKING
+                                </>
                               )}
-                              {(cashAmount + cardAmount) > invoice.balance_amount && (
-                                <p className="text-xs text-green-500 mt-1">
-                                  Change: {formatCurrency((cashAmount + cardAmount) - invoice.balance_amount)}
-                                </p>
-                              )}
-                            </div>
-                          </div>
+                            </Button>
+                          )}
+
+                          {/* Print Bill Button - Only enabled after confirmation */}
+                          <Button
+                            variant={invoice?.payment_status === 'paid' ? 'default' : 'outline'}
+                            className={`w-full py-3 ${
+                              invoice?.payment_status === 'paid' 
+                                ? 'bg-green-600 hover:bg-green-700 text-white' 
+                                : 'border-gray-300 text-gray-400 cursor-not-allowed'
+                            }`}
+                            disabled={!invoice || invoice.payment_status !== 'paid'}
+                            onClick={() => {
+                              if (invoice) {
+                                window.open(`/pos/invoices/${invoice.id}/print`, '_blank');
+                              }
+                            }}
+                          >
+                            <PrinterIcon className="w-5 h-5 mr-2" />
+                            {invoice?.payment_status === 'paid' ? 'PRINT BILL' : 'Confirm First to Print'}
+                          </Button>
                         </>
                       ) : (
                         <>
-                          {/* Single Payment Input */}
-                          <div>
-                            <Label className="text-sm text-gray-900 font-medium">
-                              {paymentType === 'cash' ? '💵 Cash Received' : '💳 Card Amount'}
-                            </Label>
-                            <Input
-                              type="number"
-                              value={receivedAmount || ''}
-                              onChange={(e) => setReceivedAmount(parseFloat(e.target.value) || 0)}
-                              placeholder="Enter amount..."
-                              className="mt-1 text-lg font-semibold text-gray-900"
-                            />
-                          </div>
-                          
-                          {paymentType === 'card' && (
-                            <div>
-                              <Label className="text-xs text-gray-600">Card Reference / Transaction ID</Label>
-                              <Input
-                                value={cardReference}
-                                onChange={(e) => setCardReference(e.target.value)}
-                                placeholder="Enter reference number"
-                                className="text-gray-900"
-                              />
-                            </div>
+                          {/* Regular Customer - Confirm Payment Button */}
+                          {invoice && invoice.payment_status !== 'paid' && (
+                            <Button
+                              className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 text-base font-semibold"
+                              disabled={!invoice || invoice.subtotal === 0 || (invoice.balance_amount > 0 && !canProcessPayment()) || isLoading}
+                              onClick={handleDirectPayment}
+                            >
+                              {isLoading ? (
+                                'Processing...'
+                              ) : (
+                                <>
+                                  <CheckCircleIcon className="w-5 h-5 mr-2" />
+                                  CONFIRM PAYMENT
+                                </>
+                              )}
+                            </Button>
                           )}
-                          
-                          {/* Balance/Change Display */}
-                          {receivedAmount > 0 && (
-                            <div className="pt-2 border-t border-gray-200">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">
-                                  {calculateBalance() >= 0 ? 'Change to Return:' : 'Remaining Balance:'}
-                                </span>
-                                <span className={`text-lg font-bold ${calculateBalance() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {formatCurrency(Math.abs(calculateBalance()))}
-                                </span>
-                              </div>
-                            </div>
+
+                          {/* Print Bill Button - Only enabled after payment */}
+                          <Button
+                            variant={invoice?.payment_status === 'paid' ? 'default' : 'outline'}
+                            className={`w-full py-3 ${
+                              invoice?.payment_status === 'paid' 
+                                ? 'bg-green-600 hover:bg-green-700 text-white' 
+                                : 'border-gray-300 text-gray-400 cursor-not-allowed'
+                            }`}
+                            disabled={!invoice || invoice.payment_status !== 'paid'}
+                            onClick={() => {
+                              if (invoice) {
+                                window.open(`/pos/invoices/${invoice.id}/print`, '_blank');
+                              }
+                            }}
+                          >
+                            <PrinterIcon className="w-5 h-5 mr-2" />
+                            {invoice?.payment_status === 'paid' ? 'PRINT BILL' : 'Pay First to Print'}
+                          </Button>
+
+                          {/* Add More Items Button - Show after payment for add-ons */}
+                          {invoice?.payment_status === 'paid' && selectedCustomer && (
+                            <Button
+                              variant="outline"
+                              className="w-full py-3 border-teal-500 text-teal-600 hover:bg-teal-50"
+                              onClick={async () => {
+                                // Create a new invoice for the same customer to add more items
+                                try {
+                                  const response = await axios.post('/pos/invoices', {
+                                    customer_id: selectedCustomer.id,
+                                    invoice_type: 'addon',
+                                    parent_invoice_id: invoice.id,
+                                  });
+                                  setInvoice(response.data.invoice);
+                                  // Reset payment state for new invoice
+                                  setPaymentType('cash');
+                                  setReceivedAmount(0);
+                                  setCashAmount(0);
+                                  setCardAmount(0);
+                                  setCardReference('');
+                                } catch (error: any) {
+                                  alert(error.response?.data?.message || 'Failed to create addon invoice');
+                                }
+                              }}
+                            >
+                              <PlusIcon className="w-5 h-5 mr-2" />
+                              ADD MORE ITEMS (Add-ons)
+                            </Button>
                           )}
                         </>
                       )}
                     </div>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="mt-4 space-y-2">
-                    {/* Confirm Payment Button - Only show if not yet paid */}
-                    {invoice && invoice.payment_status !== 'paid' && (
-                      <Button
-                        className="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 text-base font-semibold"
-                        disabled={!invoice || invoice.subtotal === 0 || (invoice.balance_amount > 0 && !canProcessPayment()) || isLoading}
-                        onClick={handleDirectPayment}
-                      >
-                        {isLoading ? (
-                          'Processing...'
-                        ) : (
-                          <>
-                            <CheckCircleIcon className="w-5 h-5 mr-2" />
-                            CONFIRM PAYMENT
-                          </>
-                        )}
-                      </Button>
-                    )}
-
-                    {/* Print Bill Button - Only enabled after payment */}
-                    <Button
-                      variant={invoice?.payment_status === 'paid' ? 'default' : 'outline'}
-                      className={`w-full py-3 ${
-                        invoice?.payment_status === 'paid' 
-                          ? 'bg-green-600 hover:bg-green-700 text-white' 
-                          : 'border-gray-300 text-gray-400 cursor-not-allowed'
-                      }`}
-                      disabled={!invoice || invoice.payment_status !== 'paid'}
-                      onClick={() => {
-                        if (invoice) {
-                          window.open(`/pos/invoices/${invoice.id}/print`, '_blank');
-                        }
-                      }}
-                    >
-                      <PrinterIcon className="w-5 h-5 mr-2" />
-                      {invoice?.payment_status === 'paid' ? 'PRINT BILL' : 'Pay First to Print'}
-                    </Button>
-
-                    {/* Add More Items Button - Show after payment for add-ons */}
-                    {invoice?.payment_status === 'paid' && selectedCustomer && (
-                      <Button
-                        variant="outline"
-                        className="w-full py-3 border-teal-500 text-teal-600 hover:bg-teal-50"
-                        onClick={async () => {
-                          // Create a new invoice for the same customer to add more items
-                          try {
-                            const response = await axios.post('/pos/invoices', {
-                              customer_id: selectedCustomer.id,
-                              invoice_type: 'addon',
-                              parent_invoice_id: invoice.id,
-                            });
-                            setInvoice(response.data.invoice);
-                            // Reset payment state for new invoice
-                            setPaymentType('cash');
-                            setReceivedAmount(0);
-                            setCashAmount(0);
-                            setCardAmount(0);
-                            setCardReference('');
-                          } catch (error: any) {
-                            alert(error.response?.data?.message || 'Failed to create addon invoice');
-                          }
-                        }}
-                      >
-                        <PlusIcon className="w-5 h-5 mr-2" />
-                        ADD MORE ITEMS (Add-ons)
-                      </Button>
-                    )}
-                  </div>
                 </div>
               </div>
             </div>
@@ -2232,9 +2650,9 @@ const POSBilling: React.FC<Props> = ({
                     <SelectValue placeholder="Choose customer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {customers.map((customer) => (
+                    {allCustomersWithMembership.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id.toString()}>
-                        {customer.name} - {customer.phone}
+                        {customer.name} - {customer.phone} {'isMember' in customer && customer.isMember ? '💎' : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>

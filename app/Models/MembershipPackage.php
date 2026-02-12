@@ -33,6 +33,8 @@ class MembershipPackage extends Model
         'sessions_used' => 'integer',
     ];
 
+    protected $appends = ['remaining_sessions'];
+
     /**
      * Get the package that this membership is based on
      */

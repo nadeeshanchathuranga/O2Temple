@@ -322,6 +322,7 @@ class POSController extends Controller
             'customer_id' => 'required|exists:customers,id',
             'bed_id' => 'required|exists:beds,id',
             'package_id' => 'required|exists:packages,id',
+            'membership_package_id' => 'nullable|exists:membership_packages,id',
             'start_time' => 'nullable|date',
             'end_time' => 'nullable|date|after:start_time',
             'start_now' => 'boolean', // If true, use server's current time
@@ -383,6 +384,7 @@ class POSController extends Controller
             // Create booking
             $booking = BedAllocation::create([
                 'customer_id' => $validated['customer_id'],
+                'membership_package_id' => $validated['membership_package_id'] ?? null,
                 'bed_id' => $validated['bed_id'],
                 'package_id' => $validated['package_id'],
                 'start_time' => $startTime,
@@ -761,7 +763,11 @@ class POSController extends Controller
         $invoice->refresh();
         $invoice->load('allocation');
         
-        if ($invoice->balance_amount > 0) {
+        // For membership bookings, allow completion even with outstanding balance
+        // (they're using pre-paid sessions, balance is on membership package)
+        $isMembershipBooking = $invoice->allocation && $invoice->allocation->membership_package_id;
+        
+        if ($invoice->balance_amount > 0 && !$isMembershipBooking) {
             return response()->json([
                 'success' => false,
                 'message' => 'Cannot complete invoice with outstanding balance.',
@@ -838,20 +844,22 @@ class POSController extends Controller
      */
     public function printInvoice(Invoice $invoice)
     {
-        $invoice->load(['items', 'payments', 'customer', 'allocation.bed', 'allocation.package', 'allocation.advancePayments', 'creator']);
+        $invoice->load(['items', 'payments', 'customer', 'allocation.bed', 'allocation.package', 'allocation.advancePayments', 'allocation.membershipPackage', 'creator']);
 
         // Calculate advance payment totals
         $advancePayments = [];
         $totalAdvancePaid = 0;
         $originalPackagePrice = 0;
+        $membershipPackage = null;
         
         if ($invoice->allocation) {
             $advancePayments = $invoice->allocation->advancePayments;
             $totalAdvancePaid = $advancePayments->sum('amount');
             $originalPackagePrice = $invoice->allocation->package->price ?? 0;
+            $membershipPackage = $invoice->allocation->membershipPackage;
         }
 
-        return view('pos.thermal-receipt', compact('invoice', 'advancePayments', 'totalAdvancePaid', 'originalPackagePrice'));
+        return view('pos.thermal-receipt', compact('invoice', 'advancePayments', 'totalAdvancePaid', 'originalPackagePrice', 'membershipPackage'));
     }
 
     /**

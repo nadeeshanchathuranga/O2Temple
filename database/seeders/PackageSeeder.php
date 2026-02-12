@@ -15,18 +15,22 @@ class PackageSeeder extends Seeder
     {
         $packages = [
             [
-                'name' => 'Basic Therapy - 30 min',
-                'duration_minutes' => 30,
-                'price' => 1500.00,
-            ],
-           
-            [
-                'name' => 'Premium Therapy - 60 min',
+                'name' => 'P1',
                 'duration_minutes' => 60,
-                'price' => 2500.00,
-            ]
+                'price' => 5000.00,
+            ],
+            [
+                'name' => 'P2',
+                'duration_minutes' => 60,
+                'price' => 10000.00,
+            ],
+            [
+                'name' => 'P3',
+                'duration_minutes' => 90,
+                'price' => 15000.00,
+            ],
         ];
-        
+
         foreach ($packages as $package) {
             Package::updateOrCreate(
                 ['name' => $package['name']],
