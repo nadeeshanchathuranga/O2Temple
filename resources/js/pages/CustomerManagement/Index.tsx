@@ -5,19 +5,24 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { PlusIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon, ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon, ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon, EyeIcon } from '@heroicons/react/24/outline';
 import CreateCustomerModal from './Components/CreateCustomerModal';
 import EditCustomerModal from './Components/EditCustomerModal';
 import DeleteCustomerModal from './Components/DeleteCustomerModal';
 import HeaderLayout from '@/layouts/header-layout';
 
 interface Customer {
-  id: number;
+  id: number | string;
+  membership_id?: number;
   name: string;
   phone: string;
   email?: string;
+  type: 'regular' | 'membership';
+  membership_status?: string;
+  remaining_sessions?: number;
+  package_name?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 interface Props {
@@ -124,11 +129,12 @@ const CustomerManagement: React.FC<Props> = ({ customers, filters }) => {
             </div>
 
             {/* Table Header */}
-            <div className="grid grid-cols-6 gap-6 px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="grid grid-cols-7 gap-4 px-6 py-4 bg-gray-50 border-b border-gray-200">
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">#</div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">NAME</div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">PHONE</div>
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">EMAIL</div>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">TYPE</div>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">STATUS</div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">JOINED</div>
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">ACTIONS</div>
             </div>
@@ -136,33 +142,84 @@ const CustomerManagement: React.FC<Props> = ({ customers, filters }) => {
             {/* Table Body */}
             <div className="divide-y divide-gray-200">
               {customers.data.map((customer, index) => (
-                <div key={customer.id} className="grid grid-cols-6 gap-6 px-6 py-4 items-center hover:bg-gray-50 transition-colors">
+                <div key={customer.id} className="grid grid-cols-7 gap-4 px-6 py-4 items-center hover:bg-gray-50 transition-colors">
                   <div className="text-sm text-gray-500 font-medium">
                     {customers.meta ? (customers.meta.current_page - 1) * customers.meta.per_page + index + 1 : index + 1}
                   </div>
 
-
-                  <div className="text-gray-700">{customer.name}</div>
+                  <div className="text-gray-700 font-medium">{customer.name}</div>
                   <div className="text-gray-700">{customer.phone}</div>
-                  <div className="text-gray-700">{customer.email || 'None'}</div>
-                  <div className="text-gray-700">{new Date(customer.created_at).toLocaleDateString()}</div>
+                  
+                  <div>
+                    {customer.type === 'membership' ? (
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-purple-100 text-purple-700">💎 MEMBER</Badge>
+                        {customer.package_name && (
+                          <span className="text-xs text-gray-500">{customer.package_name}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <Badge className="bg-blue-100 text-blue-700">👤 REGULAR</Badge>
+                    )}
+                  </div>
+
+                  <div>
+                    {customer.type === 'membership' ? (
+                      <div className="flex flex-col gap-1">
+                        <Badge 
+                          className={
+                            customer.membership_status === 'active' 
+                              ? 'bg-green-100 text-green-700' 
+                              : 'bg-gray-100 text-gray-700'
+                          }
+                        >
+                          {customer.membership_status?.toUpperCase()}
+                        </Badge>
+                        {customer.remaining_sessions !== undefined && (
+                          <span className="text-xs text-gray-500">
+                            {customer.remaining_sessions} sessions left
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <Badge className="bg-green-100 text-green-700">ACTIVE</Badge>
+                    )}
+                  </div>
+
+                  <div className="text-gray-700 text-sm">{new Date(customer.created_at).toLocaleDateString()}</div>
+                  
                   <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleEdit(customer)}
-                      className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                      onClick={() => router.get(`/customers/${customer.id}`)}
+                      className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50"
+                      title="View Details"
                     >
-                      <PencilIcon className="w-4 h-4" />
+                      <EyeIcon className="w-4 h-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(customer)}
-                      className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </Button>
+                    {customer.type === 'regular' && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(customer)}
+                          className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                          title="Edit Customer"
+                        >
+                          <PencilIcon className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(customer)}
+                          className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50"
+                          title="Delete Customer"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

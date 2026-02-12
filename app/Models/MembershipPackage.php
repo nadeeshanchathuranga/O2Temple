@@ -44,6 +44,14 @@ class MembershipPackage extends Model
     }
 
     /**
+     * Get the bed allocations for this membership package
+     */
+    public function allocations()
+    {
+        return $this->hasMany(BedAllocation::class);
+    }
+
+    /**
      * Boot method to handle events
      */
     protected static function boot()
