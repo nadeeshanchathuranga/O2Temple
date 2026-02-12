@@ -24,22 +24,58 @@ class ReportsController extends Controller
         $month = $request->month ?? now()->month;
         $day = $request->day ?? null;
         $export = $request->export ?? null;
+        $customerType = $request->customer_type ?? 'all'; // all, regular, membership
+        $includeCancelled = $request->boolean('include_cancelled', false);
+        $includeDiscounts = $request->boolean('include_discounts', true);
+        $dateFrom = $request->date_from ?? null;
+        $dateTo = $request->date_to ?? null;
 
         // If exporting, handle the export request
         if ($export) {
-            return $this->handleExport($request, $year, $month, $day, $export);
+            return $this->handleExport($request, $year, $month, $day, $export, $customerType, $includeCancelled, $includeDiscounts, $dateFrom, $dateTo);
         }
 
         // === SUMMARY CARDS ===
         
-        // Total Revenue (all time - paid invoices)
-        $totalRevenue = Invoice::where('payment_status', 'paid')->sum('total_amount');
+        // Base query for revenue calculations
+        $revenueQuery = Invoice::where('payment_status', 'paid');
         
-        // Monthly Revenue (current month)
-        $monthlyRevenue = Invoice::where('payment_status', 'paid')
-            ->whereYear('created_at', $year)
-            ->whereMonth('created_at', $month)
-            ->sum('total_amount');
+        // Apply customer type filter
+        if ($customerType !== 'all') {
+            if ($customerType === 'membership') {
+                $revenueQuery->whereHas('allocation', function($q) {
+                    $q->whereNotNull('membership_package_id');
+                });
+            } elseif ($customerType === 'regular') {
+                $revenueQuery->whereHas('allocation', function($q) {
+                    $q->whereNull('membership_package_id');
+                });
+            }
+        }
+        
+        // Apply cancelled bookings filter
+        if (!$includeCancelled) {
+            $revenueQuery->whereHas('allocation', function($q) {
+                $q->where('status', '!=', 'cancelled');
+            });
+        }
+        
+        // Apply discounts filter
+        if (!$includeDiscounts) {
+            $revenueQuery->where('discount_amount', 0);
+        }
+        
+        // Total Revenue (filtered)
+        $totalRevenue = (clone $revenueQuery)->sum('total_amount');
+        
+        // Apply date range or monthly filter for other calculations
+        if ($dateFrom && $dateTo) {
+            $revenueQuery->whereBetween('created_at', [$dateFrom, $dateTo]);
+        } else {
+            $revenueQuery->whereYear('created_at', $year)->whereMonth('created_at', $month);
+        }
+        
+        $monthlyRevenue = (clone $revenueQuery)->sum('total_amount');
         
         // Today's Revenue
         $todayRevenue = Invoice::where('payment_status', 'paid')
@@ -80,18 +116,48 @@ class ReportsController extends Controller
             ->count();
 
         // === SALES SUMMARY TABLE ===
-        $salesQuery = Invoice::with(['customer:id,name,phone', 'allocation.package:id,name', 'payments'])
-            ->where('payment_status', 'paid')
-            ->whereYear('created_at', $year)
-            ->whereMonth('created_at', $month);
+        $salesQuery = Invoice::with(['customer:id,name,phone', 'allocation.package:id,name', 'allocation.membershipPackage:id,name', 'payments'])
+            ->where('payment_status', 'paid');
+        
+        // Apply customer type filter
+        if ($customerType !== 'all') {
+            if ($customerType === 'membership') {
+                $salesQuery->whereHas('allocation', function($q) {
+                    $q->whereNotNull('membership_package_id');
+                });
+            } elseif ($customerType === 'regular') {
+                $salesQuery->whereHas('allocation', function($q) {
+                    $q->whereNull('membership_package_id');
+                });
+            }
+        }
+        
+        // Apply cancelled bookings filter
+        if (!$includeCancelled) {
+            $salesQuery->whereHas('allocation', function($q) {
+                $q->where('status', '!=', 'cancelled');
+            });
+        }
+        
+        // Apply discounts filter
+        if (!$includeDiscounts) {
+            $salesQuery->where('discount_amount', 0);
+        }
+        
+        // Apply date range or monthly filter
+        if ($dateFrom && $dateTo) {
+            $salesQuery->whereBetween('created_at', [$dateFrom, $dateTo]);
+        } else {
+            $salesQuery->whereYear('created_at', $year)->whereMonth('created_at', $month);
+        }
         
         // Apply day filter if provided
-        if ($day) {
+        if ($day && !($dateFrom && $dateTo)) {
             $salesQuery->whereDay('created_at', $day);
         }
         
         $salesSummary = $salesQuery
-            ->select('id', 'invoice_number', 'customer_id', 'allocation_id', 'invoice_type', 'total_amount', 'created_at')
+            ->select('id', 'invoice_number', 'customer_id', 'allocation_id', 'invoice_type', 'total_amount', 'discount_amount', 'created_at')
             ->orderBy('created_at', 'desc')
             ->paginate(20)
             ->through(function ($invoice) {
@@ -99,15 +165,20 @@ class ReportsController extends Controller
                 $paymentMethods = $invoice->payments->pluck('payment_method')->unique()->toArray();
                 $paymentMethodsText = empty($paymentMethods) ? 'N/A' : implode(', ', array_map('ucfirst', $paymentMethods));
                 
+                // Determine customer type
+                $customerType = $invoice->allocation && $invoice->allocation->membership_package_id ? 'Membership' : 'Regular';
+                
                 return [
                     'id' => $invoice->id,
                     'invoice_number' => $invoice->invoice_number ?? 'INV-' . str_pad($invoice->id, 6, '0', STR_PAD_LEFT),
                     'customer_name' => $invoice->customer->name ?? 'Walk-in Customer',
                     'customer_phone' => $invoice->customer->phone ?? 'N/A',
-                    'package_name' => $invoice->allocation?->package?->name ?? 'N/A',
+                    'customer_type' => $customerType,
+                    'package_name' => $invoice->allocation?->package?->name ?? ($invoice->allocation?->membershipPackage?->name ?? 'N/A'),
                     'invoice_type' => ucfirst(str_replace('_', ' ', $invoice->invoice_type)),
                     'payment_method' => $paymentMethodsText,
                     'amount' => $invoice->total_amount,
+                    'discount_amount' => $invoice->discount_amount ?? 0,
                     'date' => $invoice->created_at->format('Y-m-d'),
                     'time' => $invoice->created_at->format('H:i'),
                 ];
@@ -193,6 +264,11 @@ class ReportsController extends Controller
                 'year' => (int) $year,
                 'month' => (int) $month,
                 'day' => $day ? (int) $day : null,
+                'customer_type' => $customerType,
+                'include_cancelled' => $includeCancelled,
+                'include_discounts' => $includeDiscounts,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
             ],
         ]);
     }
@@ -200,15 +276,45 @@ class ReportsController extends Controller
     /**
      * Handle export requests
      */
-    private function handleExport(Request $request, $year, $month, $day, $format)
+    private function handleExport(Request $request, $year, $month, $day, $format, $customerType, $includeCancelled, $includeDiscounts, $dateFrom, $dateTo)
     {
         // Get sales data for export
-        $salesQuery = Invoice::with(['customer:id,name,phone', 'allocation.package:id,name', 'payments'])
-            ->where('payment_status', 'paid')
-            ->whereYear('created_at', $year)
-            ->whereMonth('created_at', $month);
+        $salesQuery = Invoice::with(['customer:id,name,phone', 'allocation.package:id,name', 'allocation.membershipPackage:id,name', 'payments'])
+            ->where('payment_status', 'paid');
         
-        if ($day) {
+        // Apply customer type filter
+        if ($customerType !== 'all') {
+            if ($customerType === 'membership') {
+                $salesQuery->whereHas('allocation', function($q) {
+                    $q->whereNotNull('membership_package_id');
+                });
+            } elseif ($customerType === 'regular') {
+                $salesQuery->whereHas('allocation', function($q) {
+                    $q->whereNull('membership_package_id');
+                });
+            }
+        }
+        
+        // Apply cancelled bookings filter
+        if (!$includeCancelled) {
+            $salesQuery->whereHas('allocation', function($q) {
+                $q->where('status', '!=', 'cancelled');
+            });
+        }
+        
+        // Apply discounts filter
+        if (!$includeDiscounts) {
+            $salesQuery->where('discount_amount', 0);
+        }
+        
+        // Apply date range or monthly filter
+        if ($dateFrom && $dateTo) {
+            $salesQuery->whereBetween('created_at', [$dateFrom, $dateTo]);
+        } else {
+            $salesQuery->whereYear('created_at', $year)->whereMonth('created_at', $month);
+        }
+        
+        if ($day && !($dateFrom && $dateTo)) {
             $salesQuery->whereDay('created_at', $day);
         }
         
